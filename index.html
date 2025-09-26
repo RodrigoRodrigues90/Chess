@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="javaScript/jogo.js" defer></script>
+    <link rel="stylesheet" href="./css/estilo.css">
+    <link rel="icon" href="./img/horse.png" type="image/x-icon">
+    <title>MiChess</title>
+</head>
+<body onload="desabilitarPlay()">
+    <input id="volume" type="button" class="volumeButton" onclick="stopMusic()"></input>
+    <section class="wrapper-jogo" id="wrapper-play">
+        <h1 id="title"><img style="width: 36px;" src="./img/horse.png" class="horse"> MiChess&copy;</h1>
+
+        <div class="info">
+
+            <div style="display: none;">
+                <!--peças negras-->
+                <img src="./img/peças_negras/Black_Bishop.png" class="pieces" id="blackBishop">
+                <img src="./img/peças_negras/black_knight.png" class="pieces" id="blackKnight">
+                <img src="./img/peças_negras/black_Castle.png" class="pieces" id="blackCastle">
+                <img src="./img/peças_negras/black_King.png" class="pieces" id="blackking">
+                <img src="./img/peças_negras/Queen.png" class="pieces" id="blackQueen">
+                <img src="./img/peças_negras/black_Pone.png" class="pieces" id="blackPone">
+
+                <!--peças brancas-->
+                <img src="./img/peças_brancas/white_Bishop.png" class="pieces" id="whiteBishop">
+                <img src="./img/peças_brancas/white_Knight.png" class="pieces" id="whiteKnight">
+                <img src="./img/peças_brancas/white_Castle.png" class="pieces" id="whiteCastle">
+                <img src="./img/peças_brancas/white_King.png" class="pieces" id="whiteking">
+                <img src="./img/peças_brancas/White_Queen.png" class="pieces" id="whiteQueen">
+                <img src="./img/peças_brancas/white_Pone.png" class="pieces" id="whitePone">
+            </div>
+            <div class="wrapper-canvas">
+                <canvas class="canvas" id="canvas"></canvas>
+                <div class="tempo1">
+                    <p id="tempo1">05:00</p>
+                    <p id="placar1"></p>
+                </div>
+                <div class="tempo2">
+                    <p id="placar2"></p>
+                    <p id="tempo2">05:00</p>
+                </div>
+            </div>
+
+            <div class="options">
+                <div>
+                    <p id="vez"> Escolha a cor das peças. </p>
+                </div>
+
+                <div>
+                    <input class="input" type="radio" id="brancas" name="opcao" onclick="escolherCor(this.id)">
+                    <label>Brancas</label>
+                    <input class="input" type="radio" id="negras" name="opcao" onclick="escolherCor(this.id)">
+                    <label>Pretas</label>
+                </div>
+
+                <div class="div-button">
+                    <input type="button" class="play" id="play" value="Jogar" onclick="play()">
+                </div>
+            </div>
+    </section>
+    <footer>
+        <div class="rodape">
+            <div>
+                <p>Desenvolvido por: <a href="https://rodrigo-0990.github.io/Portfolio/" target="blank"> Rodrigo Rodrigues.</a></p>
+            </div>
+            <div class="divIcons">
+                <div class="contatoIcon">
+                    <a href="https://github.com/RodriGo-0990" target="blank"> <img src="./img/github.svg"
+                            alt="github-icon" title="Github"></a>
+                </div>
+                <div class="contatoIcon">
+                    <a href="https://www.instagram.com/rodrigo_rodrigues0990/" target="blank"> <img
+                            src="./img/instagram.svg" alt="Instagram-icon" title="Instagram"></a>
+                </div>
+                <div class="contatoIcon">
+                    <a href="https://www.linkedin.com/in/rodrigo-madruga-rodrigues-7478491b3/" target="blank"> <img
+                            src="./img/linkedin.svg" alt="Linkedin-icon" title="Linkedin"></a>
+
+                </div>
+                <div class="contatoIcon">
+                    <a href="https://wa.me/5548998330229" target="blank">
+                        <img src="./img/whats.svg" alt="whatsapp-icon" title="WhatsApp"></a>
+                </div>
+                <div class="contatoIcon">
+                    <a href="mailto:rodrigorodrigues0990@hotmail.com"><img src="./img/mail.png"></a>
+                </div>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

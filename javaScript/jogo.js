@@ -4,15 +4,17 @@ const display1 = document.querySelector("#tempo1");//relogio de cima
 const display2 = document.querySelector("#tempo2");//relogio de baixo
 const placar1 = document.querySelector("#placar1");//placar 1
 const placar2 = document.querySelector("#placar2");//placar 2 
-const boardgame = new Array(64);// locais das casas do tabuleiro
+export const boardgame = new Array(64);// locais das casas do tabuleiro
 let coordenate_x = 0;//horizontal
 let coordenate_y = 0;//vertical
 let casa = 0;//usado para atualização do tabuleiro
 let invertido;// um Boolean: se escolher as pretas o tabuleiro é invertido;
-const brancas = 1; //time brancas
-const pretas = 0; //time pretas
-let isxeque;
-
+export const brancas = 1; //time brancas
+export const pretas = 0; //time pretas
+export let isxeque;
+import { calculateBishopDestinations, calculateKnightDestinations } from "./calculate_moves_utils.js";
+import { nullCastleIAByMovePiece, placeNotationToSquare, isCasaSobAtaque } from "./rules_IA_utils.js";
+//import { gerarFENdoTabuleiro } from "./fen_utils.js";
 
 //------variaveis IA--------//
 let movimentosArray = new Array(10000)
@@ -61,15 +63,16 @@ function selecionarMovimentoAleatorio(array) {
 }
 
 function checkBestMoves() {
+    //console.log(gerarFENdoTabuleiro(boardgame, turno, 1));
     if (timeIA == turno) {
-        for (index = 0; index < boardgame.length; index++) {
+        for (let index = 0; index < boardgame.length; index++) {
 
             if (boardgame[index].getPiece() != null &&
                 boardgame[index].getPiece().getTeam() == turno) {
 
                 boardgame[index].getPiece().move(index);
 
-                for (j = 0; j < boardgame.length; j++) {
+                for (let j = 0; j < boardgame.length; j++) {
 
                     if (boardgame[j].getPiece() != null && boardgame[j].getPiece().getAtacked()) {
                         movimentosArray.unshift(new Movimentos(boardgame[index], boardgame[j], boardgame[index].getPiece(), boardgame[j].getPiece(), boardgame[j].getPiece().getPontos()));
@@ -116,14 +119,14 @@ function checkBestMoves() {
 
 
 //-----variáveis de tempo--------
-var segundosTempo1 = 59;
-var minutosTempo1 = 4;
-var segundosTempo2 = 59;
-var minutosTempo2 = 4;
-var tempo1;
-var tempo2;
-let placarBrancas = 0;
-let placarPretas = 0;
+export var segundosTempo1 = 59;
+export var minutosTempo1 = 4;
+export var segundosTempo2 = 59;
+export var minutosTempo2 = 4;
+export var tempo1;
+export var tempo2;
+export let placarBrancas = 0;
+export let placarPretas = 0;
 //-------------------------------
 
 
@@ -217,8 +220,8 @@ function startTimer() {
             segundosTempo1 = 59;
         }
 
-        minutos = minutosTempo1 < 10 ? "0" + minutosTempo1 : minutosTempo1;
-        segundos = segundosTempo1 < 10 ? "0" + segundosTempo1 : segundosTempo1;
+        let minutos = minutosTempo1 < 10 ? "0" + minutosTempo1 : minutosTempo1;
+        let segundos = segundosTempo1 < 10 ? "0" + segundosTempo1 : segundosTempo1;
         if (!invertido) {
             display1.textContent = minutos + ":" + segundos;
         } else {
@@ -256,8 +259,8 @@ function startTimer() {
             segundosTempo2 = 59;
         }
 
-        minutos = minutosTempo2 < 10 ? "0" + minutosTempo2 : minutosTempo2;
-        segundos = segundosTempo2 < 10 ? "0" + segundosTempo2 : segundosTempo2;
+        let minutos = minutosTempo2 < 10 ? "0" + minutosTempo2 : minutosTempo2;
+        let segundos = segundosTempo2 < 10 ? "0" + segundosTempo2 : segundosTempo2;
         if (invertido) {
             display1.textContent = minutos + ":" + segundos;
         } else {
@@ -306,13 +309,13 @@ function pausarTempo(turno) {
 function checkXeque() {//conferir se o lance está em xeque
     isxeque = false;
     //move todos.
-    for (index = 0; index < boardgame.length; index++) {
+    for (let index = 0; index < boardgame.length; index++) {
         if (boardgame[index].getPiece() != null) {
             boardgame[index].getPiece().move(index);
         }
     }
     //acha o rei e verifica se está em xeque
-    for (int = 0; int < boardgame.length; int++) {
+    for (let int = 0; int < boardgame.length; int++) {
         var vez = turno == brancas ? "brancas" : "pretas"
         var Wking = new whiteKing(0, 0);
         var Bking = new blackKing(0, 0);
@@ -445,6 +448,8 @@ function instanciarClasse(params, x, y) {
     var BKnight = new blackKnight(x, y);
     var BQueen = new blackQueen(x, y);
 
+    nullCastleIAByMovePiece(params);
+
     cancelEnPassant(Wpawn, Bpawn);
 
     if (Object.is(obj.constructor, Wpawn.constructor)) {
@@ -460,7 +465,7 @@ function instanciarClasse(params, x, y) {
             playPromoSound();
             return WQueen;//...promovido!
         } else {
-            return Wpawn;//continua peão.
+            return Wpawn; //continua peão.
         }
 
     }
@@ -626,25 +631,49 @@ function pawnAttack(value, thisTeam) {
     }
 }
 function checkWhiteRoqueMove(casaDaTorre, casaDoRoque) {
-    var roqueValido;
+    var isRookFirstMove;
     var obj;
     var WCastle = new whiteCastle(0, 0);
+    var KING_INDEX = 60;
+    const corAtacante = pretas; // A cor adversária
+    let pathIsSafe = false; // Flag para determinar se o caminho está livre de ataques
+
     if (boardgame[casaDaTorre].getPiece() != null) {
         obj = Object.prototype.constructor(boardgame[casaDaTorre].getPiece());
         if (Object.is(obj.constructor, WCastle.constructor)) {
-            roqueValido = boardgame[casaDaTorre].getPiece().isFirstMove();
-            if (roqueValido != false && isxeque != true) {
-                boardgame[casaDoRoque].setRoqueMove(true);
-                torreDoRoque = boardgame[casaDaTorre].getPiece();
+            isRookFirstMove = boardgame[casaDaTorre].getPiece().isFirstMove();
+            if (isRookFirstMove != false && isxeque != true) {
+                if (casaDaTorre === 63 && casaDoRoque === 62) {
+                    // Checagem de Ataque: F1 (61), G1 (62) ROQUE CURTO
+                    if (!isCasaSobAtaque(KING_INDEX + 1, corAtacante) // casa ao lado direito do rei (F1) 
+                        && !isCasaSobAtaque(62, corAtacante) // G1
+                    ) {
+                        pathIsSafe = true;
+                    }
+                }
+                else if (casaDaTorre === 56 && casaDoRoque === 58) {
+                    // Checagem de Ataque: D1 (59), C1 (58) ROQUE GRANDE
+                    if (!isCasaSobAtaque( KING_INDEX - 1, corAtacante) //D1 
+                        && !isCasaSobAtaque(58, corAtacante) //C1
+                    ) { 
+                        pathIsSafe = true;
+                    }
+                }
+                // EXECUÇÃO: Apenas define o movimento se for seguro
+                if (pathIsSafe) {
+                    boardgame[casaDoRoque].setRoqueMove(true);
+                    torreDoRoque = boardgame[casaDaTorre].getPiece();
+                }
             }
-            if (casaDoRoque < casaDaTorre) {
-                casaRoqueRei = boardgame[casaDaTorre];
-            } else {
-                casaRoqueDama = boardgame[casaDaTorre];
-            }
+        }
+        if (casaDoRoque < casaDaTorre) {
+            casaRoqueRei = boardgame[casaDaTorre];
+        } else {
+            casaRoqueDama = boardgame[casaDaTorre];
         }
     }
 }
+
 function checkBlackRoqueMove(casaDaTorre, casaDoRoque) {
     var roqueValido;
     var obj;
@@ -700,7 +729,7 @@ function checkWhitePawnEnPassant(value) {
 }
 function cancelEnPassant(Wpawn, Bpawn) {
 
-    for (int = 0; int < boardgame.length; int++) {
+    for (let int = 0; int < boardgame.length; int++) {
 
         if (boardgame[int].getPiece() != null) {
             var obj = Object.prototype.constructor(boardgame[int].getPiece());
@@ -732,12 +761,15 @@ function reset() {
 
     }
 }
+
+//renderiza o tabuleiro e as peças
 function render(ctx, invertido) {
 
     // percorre o Array instanciando objetos "casas"
     for (let i = 0; i < boardgame.length; i++) {
 
         boardgame[i] = new casas(coordenate_x, coordenate_y)
+        boardgame[i].setIndex(placeNotationToSquare(i));
         coordenate_x += 37.8;
         casa++;
         if (casa == 8) {
@@ -784,7 +816,6 @@ function render(ctx, invertido) {
     boardgame[61].placePiece(new whiteBishop(boardgame[61].x, boardgame[61].y)); boardgame[61].getPiece().printPiece(ctx, invertido);
     boardgame[62].placePiece(new whiteKnight(boardgame[62].x, boardgame[62].y)); boardgame[62].getPiece().printPiece(ctx, invertido);
     boardgame[63].placePiece(new whiteCastle(boardgame[63].x, boardgame[63].y)); boardgame[63].getPiece().printPiece(ctx, invertido);
-
 }
 function constRender(ctx, inv) {
 
@@ -827,6 +858,7 @@ class casas {
     constructor(x, y) {
         this.x = x;
         this.y = y;
+        this.index = '';
         this.width = 33;
         this.height = 16;
         this.isFill = false;
@@ -918,6 +950,9 @@ class casas {
             return false;
         }
     }
+    setIndex(index) {
+        this.index = index;
+    }
     setEnpassant(set) {
         this.casaEnPassant = set;
     }
@@ -935,6 +970,9 @@ class casas {
     }
     isFilled() {
         return this.isFill;
+    }
+    getIndex() {
+        return this.index;
     }
     getPiece() {
         return this.piece;
@@ -986,18 +1024,26 @@ function printThis(ctx, x, y, inv, img) {//chama os metodos de desenho do canvas
 
 //--------peças brancas---------
 class whiteCastle extends piece {
-    super(x, y) {
+    constructor(x, y) {
+        super(x, y)
         this.x = x;
         this.y = y;
+        this.name = "Torre";
         this.select = false;
         this.atacked = false;
         this.firstmove = true;
+    }
+    getName() {
+        return this.name;
     }
     setAtacado(set) {
         this.atacked = set;
     }
     getPontos() {
         return 100;
+    }
+    getName() {
+        return this.name;
     }
     getSelect() {
         return this.select;
@@ -1022,6 +1068,9 @@ class whiteCastle extends piece {
     }
     erasePiece(ctx) {
         ctx.clearRect(this.x, this.y, 35, 18);
+    }
+    calculateMoves(index, color){
+        return []
     }
     move(value) {
         var initial = value;
@@ -1071,14 +1120,19 @@ class whiteCastle extends piece {
     }
 }
 class whiteKing extends piece {
-    super(x, y) {
+
+    constructor(x, y) {
+        super(x, y)
         this.x = x;
         this.y = y;
+        this.name = "Rei";
         this.select = false;
         this.atacked = false;
         this.firstmove = true;
     }
-
+    getName() {
+        return this.name;
+    }
     setAtacado(set) {
         this.atacked = set;
     }
@@ -1109,6 +1163,9 @@ class whiteKing extends piece {
     }
     erasePiece(ctx) {
         ctx.clearRect(this.x, this.y, 35, 18);
+    }
+    calculateMoves(index, color){
+        return []
     }
     move(value) {
         var initial = value;
@@ -1153,20 +1210,25 @@ class whiteKing extends piece {
         }
         value = initial;
 
-        if (this.firstmove == undefined && boardgame[value + 1].getPiece() == null && boardgame[value + 2].getPiece() == null) {
+        if (this.firstmove === true && boardgame[value + 1].getPiece() == null && boardgame[value + 2].getPiece() == null) {
             checkWhiteRoqueMove(value + 3, value + 2);
         }
-        if (this.firstmove == undefined && boardgame[value - 1].getPiece() == null && boardgame[value - 2].getPiece() == null && boardgame[value - 3].getPiece() == null) {
+        if (this.firstmove === true && boardgame[value - 1].getPiece() == null && boardgame[value - 2].getPiece() == null && boardgame[value - 3].getPiece() == null) {
             checkWhiteRoqueMove(value - 4, value - 2);
         }
     }
 }
 class whiteBishop extends piece {
-    super(x, y) {
+    constructor(x, y) {
+        super(x, y)
         this.x = x;
         this.y = y;
+        this.name = 'Bispo';
         this.select = false;
         this.atacked = false;
+    }
+    getName() {
+        return this.name;
     }
     setAtacado(set) {
         this.atacked = set;
@@ -1191,6 +1253,9 @@ class whiteBishop extends piece {
     }
     erasePiece(ctx) {
         ctx.clearRect(this.x, this.y, 35, 18);
+    }
+    calculateMoves(index, color){
+        return calculateBishopDestinations(index,color)
     }
     move(value) {
 
@@ -1317,13 +1382,17 @@ class whiteBishop extends piece {
     }
 }
 class whiteKnight extends piece {
-    super(x, y) {
+    constructor(x, y) {
+        super(x, y)
         this.x = x;
         this.y = y;
+        this.name = 'Cavalo'
         this.select = false;
         this.atacked = false;
     }
-
+    getName() {
+        return this.name;
+    }
     setAtacado(set) {
         this.atacked = set;
     }
@@ -1347,6 +1416,9 @@ class whiteKnight extends piece {
     }
     erasePiece(ctx) {
         ctx.clearRect(this.x, this.y, 35, 18);
+    }
+    calculateMoves(index, color){
+        return calculateKnightDestinations(index,color)
     }
     move(value) {
 
@@ -1384,13 +1456,17 @@ class whiteKnight extends piece {
     }
 }
 class whiteQueen extends piece {
-    super(x, y) {
+    constructor(x, y) {
+        super(x, y)
         this.x = x;
         this.y = y;
+        this.name = 'Dama'
         this.select = false;
         this.atacked = false;
     }
-
+    getName() {
+        return this.name;
+    }
     setAtacado(set) {
         this.atacked = set;
     }
@@ -1414,6 +1490,9 @@ class whiteQueen extends piece {
     }
     erasePiece(ctx) {
         ctx.clearRect(this.x, this.y, 35, 18);
+    }
+    calculateMoves(index, color){
+        return []
     }
     move(value) {
         //================================== Movimentação horizontal e vertical ===================================
@@ -1597,13 +1676,18 @@ class whiteQueen extends piece {
 
 }
 class whitePawn extends piece {
-    super(x, y) {
+    constructor(x, y) {
+        super(x, y)
         this.x = x;
         this.y = y;
+        this.name = 'Peão'
         this.select = false;
         this.atacked = false;
         this.firstmove = true;
         this.doubleStep = false;
+    }
+    getName() {
+        return this.name;
     }
     setAtacado(set) {
         this.atacked = set;
@@ -1641,9 +1725,12 @@ class whitePawn extends piece {
     erasePiece(ctx) {
         ctx.clearRect(this.x, this.y, 35, 18);
     }
+    calculateMoves(value, color) {
+        return []
+    }
     move(value) {
         //movimento para a frente
-        if (this.firstmove == undefined && boardgame[value - 8].getPiece() == null && boardgame[value - 16].getPiece() == null) {
+        if (this.firstmove == true && boardgame[value - 8].getPiece() == null && boardgame[value - 16].getPiece() == null) {
             movement(value - 8, brancas);
             movement(value - 16, brancas);
         } else if (boardgame[value - 8].getPiece() == null) {
@@ -1665,14 +1752,18 @@ class whitePawn extends piece {
 
 //---------peças pretas----------
 class blackCastle extends piece {
-    super(x, y) {
+    constructor(x, y) {
+        super(x, y)
         this.x = x;
         this.y = y;
+        this.name = "Torre";
         this.select = false;
         this.atacked = false;
         this.firstmove = true;
     }
-
+    getName() {
+        return this.name;
+    }
     setAtacado(set) {
         this.atacked = set;
     }
@@ -1702,6 +1793,9 @@ class blackCastle extends piece {
     }
     erasePiece(ctx) {
         ctx.clearRect(this.x, this.y, 35, 18);
+    }
+    calculateMoves(index, color){
+        return []
     }
     move(value) {
         var initial = value;
@@ -1751,12 +1845,17 @@ class blackCastle extends piece {
     }
 }
 class blackKing extends piece {
-    super(x, y) {
+    constructor(x, y) {
+        super(x, y)
         this.x = x;
         this.y = y;
+        this.name = "Rei";
         this.select = false;
         this.atacked = false;
         this.firstmove = true;
+    }
+    getName() {
+        return this.name;
     }
 
     setAtacado(set) {
@@ -1788,6 +1887,9 @@ class blackKing extends piece {
     }
     erasePiece(ctx) {
         ctx.clearRect(this.x, this.y, 35, 18);
+    }
+    calculateMoves(index, color){
+        return []
     }
     move(value) {
         var initial = value;
@@ -1832,23 +1934,27 @@ class blackKing extends piece {
         }
         value = initial;
 
-        if (this.firstmove == undefined && boardgame[value + 1].getPiece() == null && boardgame[value + 2].getPiece() == null) {
+        if (this.firstmove == true && boardgame[value + 1].getPiece() == null && boardgame[value + 2].getPiece() == null) {
             checkBlackRoqueMove(value + 3, value + 2);
         }
-        if (this.firstmove == undefined && boardgame[value - 1].getPiece() == null && boardgame[value - 2].getPiece() == null && boardgame[value - 3].getPiece() == null) {
+        if (this.firstmove == true && boardgame[value - 1].getPiece() == null && boardgame[value - 2].getPiece() == null && boardgame[value - 3].getPiece() == null) {
             checkBlackRoqueMove(value - 4, value - 2);
         }
 
     }
 }
 class blackBishop extends piece {
-    super(x, y) {
+    constructor(x, y) {
+        super(x, y)
         this.x = x;
         this.y = y;
+        this.name = 'Bispo'
         this.select = false;
         this.atacked = false;
     }
-
+    getName() {
+        return this.name;
+    }
     setAtacado(set) {
         this.atacked = set;
     }
@@ -1872,6 +1978,9 @@ class blackBishop extends piece {
     }
     erasePiece(ctx) {
         ctx.clearRect(this.x, this.y, 35, 18);
+    }
+    calculateMoves(index, color){
+        return calculateBishopDestinations(index,color)
     }
     move(value) {
         var initial = value;// valor inicial, posição da peça no Array
@@ -1998,13 +2107,17 @@ class blackBishop extends piece {
     }
 }
 class blackKnight extends piece {
-    super(x, y) {
+    constructor(x, y) {
+        super(x, y)
         this.x = x;
         this.y = y;
+        this.name = 'Cavalo'
         this.select = false;
         this.atacked = false;
     }
-
+    getName() {
+        return this.name;
+    }
     setAtacado(set) {
         this.atacked = set;
     }
@@ -2028,6 +2141,9 @@ class blackKnight extends piece {
     }
     erasePiece(ctx) {
         ctx.clearRect(this.x, this.y, 35, 18);
+    }
+    calculateMoves(index,color){
+        return calculateKnightDestinations(index,color);
     }
     move(value) {
 
@@ -2066,13 +2182,17 @@ class blackKnight extends piece {
     }
 }
 class blackQueen extends piece {
-    super(x, y) {
+    constructor(x, y) {
+        super(x, y)
         this.x = x;
         this.y = y;
+        this.name = 'Dama'
         this.select = false;
         this.atacked = false;
     }
-
+    getName() {
+        return this.name;
+    }
     setAtacado(set) {
         this.atacked = set;
     }
@@ -2096,6 +2216,9 @@ class blackQueen extends piece {
     }
     erasePiece(ctx) {
         ctx.clearRect(this.x, this.y, 35, 18);
+    }
+    calculateMoves(index, color){
+        return []
     }
     move(value) {
         //================================== Movimentação horizontal e vertical ===================================
@@ -2278,13 +2401,18 @@ class blackQueen extends piece {
     }
 }
 class blackPawn extends piece {
-    super(x, y) {
+    constructor(x, y) {
+        super(x, y)
         this.x = x;
         this.y = y;
+        this.name = 'Peão'
         this.select = false;
         this.atacked = false;
         this.firstmove = true;
         this.doubleStep = false;
+    }
+    getName() {
+        return this.name;
     }
     setAtacado(set) {
         this.atacked = set;
@@ -2322,10 +2450,13 @@ class blackPawn extends piece {
     erasePiece(ctx) {
         ctx.clearRect(this.x, this.y, 35, 18);
     }
+    calculateMoves(index, color){
+        return []
+    }
     move(value) {
         //movimento para a frente
 
-        if (this.firstmove == undefined && boardgame[value + 8].getPiece() == null && boardgame[value + 16].getPiece() == null) {
+        if (this.firstmove == true && boardgame[value + 8].getPiece() == null && boardgame[value + 16].getPiece() == null) {
             movement(value + 8, pretas);
             movement(value + 16, pretas);
         } else if (boardgame[value + 8].getPiece() == null) {
@@ -2344,7 +2475,6 @@ class blackPawn extends piece {
     }
 }
 //-------------------------------
-
 
 //----botoes da pagina-----------
 function desabilitarPlay() {
@@ -2404,7 +2534,7 @@ function play() {
             y = -(event.clientY - (rect.bottom - 23)) * (canvas.height + 20) / rect.height;
         }
         constRender(context, invertido);
-        for (i = 0; i < boardgame.length; i++) {
+        for (let i = 0; i < boardgame.length; i++) {
 
             if (boardgame[i].calcDistance(x, y)) {
                 boardgame[i].printFull(context, colorgrey);
@@ -2429,7 +2559,7 @@ function play() {
         }
 
         if (turno != timeIA) {
-            for (i = 0; i < boardgame.length; i++) {
+            for (let i = 0; i < boardgame.length; i++) {
 
                 if (boardgame[i].calcDistance(x, y)) {
 
@@ -2543,4 +2673,8 @@ function play() {
 
     })
 }
+window.desabilitarPlay = desabilitarPlay;
+window.escolherCor = escolherCor;
+window.play = play;
+window.stopMusic = stopMusic;
 //-------------------------------

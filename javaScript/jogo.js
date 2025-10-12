@@ -12,8 +12,9 @@ let invertido;// um Boolean: se escolher as pretas o tabuleiro é invertido;
 export const brancas = 1; //time brancas
 export const pretas = 0; //time pretas
 export let isxeque;
-import { calculateBishopDestinations, calculateKnightDestinations } from "./calculate_moves_utils.js";
-import { nullCastleIAByMovePiece, placeNotationToSquare, isCasaSobAtaque } from "./rules_IA_utils.js";
+import { calculateBishopDestinations, calculateKingDestinations, calculateKnightDestinations, calculatePawnDestinations, calculateQueenDestinations, calculateRookDestinations } from "./calculate_moves_utils.js";
+import { setEnPassantSquare, gerarFENdoTabuleiro } from "./fen_utils.js";
+import { nullCastleIAByMovePiece, placeNotationToSquare, isCasaSobAtaque, searchForIndexEnPassant } from "./rules_IA_utils.js";
 //import { gerarFENdoTabuleiro } from "./fen_utils.js";
 
 //------variaveis IA--------//
@@ -139,6 +140,7 @@ let casaDestinoY;
 let selectedPiece;
 let pecaEliminada;
 let casaEnPassant;
+let casaEnPassantSquare;
 let casaRoqueMove;
 let casaRoqueDama;
 let casaRoqueRei;
@@ -449,13 +451,14 @@ function instanciarClasse(params, x, y) {
     var BQueen = new blackQueen(x, y);
 
     nullCastleIAByMovePiece(params);
-
+    setEnPassantSquare(null);
     cancelEnPassant(Wpawn, Bpawn);
 
     if (Object.is(obj.constructor, Wpawn.constructor)) {
         Wpawn.setFirstMove(false);//regra de primeiro movimento do peão.
 
         if (casaAtualY - casaDestinoY > 20) {// verifica se é passo duplo do peão, para a regra do EnPassant.
+            setEnPassantSquare(searchForIndexEnPassant(casaDestino, brancas));
             Wpawn.setDoubleStep(true);
         } else {
             Wpawn.setDoubleStep(false);
@@ -489,6 +492,7 @@ function instanciarClasse(params, x, y) {
     if (Object.is(obj.constructor, Bpawn.constructor)) {
         Bpawn.setFirstMove(false);//regra de primeiro movimento do peão.
         if (casaDestinoY - casaAtualY > 20) {// verifica se é passo duplo do peão, para a regra do EnPassant.
+            setEnPassantSquare(searchForIndexEnPassant(casaDestino, pretas));
             Bpawn.setDoubleStep(true);
         } else {
             Bpawn.setDoubleStep(false);
@@ -518,6 +522,7 @@ function instanciarClasse(params, x, y) {
     if (Object.is(obj.constructor, BQueen.constructor)) {
         return BQueen;
     }
+
 }
 function instanciarTorre(x, y) {
     var obj = Object.prototype.constructor(torreDoRoque);
@@ -541,10 +546,10 @@ function verificaAtaque(valor) {
         boardgame[valor].takeOffPiece();
         pontuacao(pecaEliminada);
         boardgame[valor].placePiece(instanciarClasse(selectedPiece, boardgame[valor].x, boardgame[valor].y));
-        setTimeout(() => {
-            checkBestMoves();
+        // setTimeout(() => {
+        //     checkBestMoves();
 
-        }, 3000)
+        // }, 3000)
         checkXeque();
         valida = true;
         reset();
@@ -553,14 +558,18 @@ function verificaAtaque(valor) {
     }
     return valida;
 }
+/**
+ * metodo que pinta as casas de movimentação, iterando sobre o Array Boardgame
+ * @param {Boolean} thisTeam cor da peça que está a movimentar
+ * @param {Number} value indice de casa do tabuleiro para onde a peça vai
+ */
 function movement(value, thisTeam) {
-    //metodo genérico que pinta as casas de movimentação, iterando sobre o Array
     if (value <= boardgame.length && value >= 0) {
         if (boardgame[value].getPiece() == null) { //se a casa está vazia 
             boardgame[value].setSetted(true);// pinta de verde
         } else {
             var piece = boardgame[value].getPiece();//se a casa tem peça
-            if (!thisTeam == piece.getTeam()) {//se a peça é do adversário
+            if (thisTeam != piece.getTeam()) {//se a peça é do adversário
                 piece.setAtacado(true);//pinta a casa de vermelho
             }
         }
@@ -653,9 +662,9 @@ function checkWhiteRoqueMove(casaDaTorre, casaDoRoque) {
                 }
                 else if (casaDaTorre === 56 && casaDoRoque === 58) {
                     // Checagem de Ataque: D1 (59), C1 (58) ROQUE GRANDE
-                    if (!isCasaSobAtaque( KING_INDEX - 1, corAtacante) //D1 
+                    if (!isCasaSobAtaque(KING_INDEX - 1, corAtacante) //D1 
                         && !isCasaSobAtaque(58, corAtacante) //C1
-                    ) { 
+                    ) {
                         pathIsSafe = true;
                     }
                 }
@@ -675,24 +684,45 @@ function checkWhiteRoqueMove(casaDaTorre, casaDoRoque) {
 }
 
 function checkBlackRoqueMove(casaDaTorre, casaDoRoque) {
-    var roqueValido;
+    var isRookFirstMove;
     var obj;
     var BCastle = new blackCastle(0, 0);
+    var KING_INDEX = 4;
+    const corAtacante = brancas; // A cor adversária
+    let pathIsSafe = false; // Flag para determinar se o caminho está livre de ataques
+
     if (boardgame[casaDaTorre].getPiece() != null) {
-
         obj = Object.prototype.constructor(boardgame[casaDaTorre].getPiece());
-
         if (Object.is(obj.constructor, BCastle.constructor)) {
-            roqueValido = boardgame[casaDaTorre].getPiece().isFirstMove();
-            if (roqueValido != false && isxeque != true) {
-                boardgame[casaDoRoque].setRoqueMove(true);
-                torreDoRoque = boardgame[casaDaTorre].getPiece();
+            isRookFirstMove = boardgame[casaDaTorre].getPiece().isFirstMove();
+            if (isRookFirstMove != false && isxeque != true) {
+                if (casaDaTorre === 7 && casaDoRoque === 6) {
+                    // Checagem de Ataque: F8 (5), G8 (6) ROQUE CURTO
+                    if (!isCasaSobAtaque(KING_INDEX + 1, corAtacante) // casa ao lado direito do rei (F8) 
+                        && !isCasaSobAtaque(6, corAtacante) // G8
+                    ) {
+                        pathIsSafe = true;
+                    }
+                }
+                else if (casaDaTorre === 0 && casaDoRoque === 2) {
+                    // Checagem de Ataque: D8 (3), C8 (2) ROQUE GRANDE
+                    if (!isCasaSobAtaque(KING_INDEX - 1, corAtacante) //D8 
+                        && !isCasaSobAtaque(2, corAtacante) //C8
+                    ) {
+                        pathIsSafe = true;
+                    }
+                }
+                // EXECUÇÃO: Apenas define o movimento se for seguro
+                if (pathIsSafe) {
+                    boardgame[casaDoRoque].setRoqueMove(true);
+                    torreDoRoque = boardgame[casaDaTorre].getPiece();
+                }
             }
-            if (casaDoRoque < casaDaTorre) {
-                casaRoqueRei = boardgame[casaDaTorre];
-            } else {
-                casaRoqueDama = boardgame[casaDaTorre];
-            }
+        }
+        if (casaDoRoque < casaDaTorre) {
+            casaRoqueRei = boardgame[casaDaTorre];
+        } else {
+            casaRoqueDama = boardgame[casaDaTorre];
         }
     }
 }
@@ -1069,53 +1099,13 @@ class whiteCastle extends piece {
     erasePiece(ctx) {
         ctx.clearRect(this.x, this.y, 35, 18);
     }
-    calculateMoves(index, color){
-        return []
+    calculateMoves(index, color) {
+        return calculateRookDestinations(index, color)
     }
     move(value) {
-        var initial = value;
-        while (!boardgame[value].bounderyRight()) {
-            value++;
-            if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == brancas) {
-                break;
-            } if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == pretas) {
-                movement(value, brancas);
-                break;
-            }
-            movement(value, brancas)
-        }
-        value = initial;
-        while (!boardgame[value].bounderyLeft()) {
-            value--;
-            if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == brancas) {
-                break;
-            } if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == pretas) {
-                movement(value, brancas);
-                break;
-            }
-            movement(value, brancas);
-        }
-        value = initial;
-        while (!boardgame[value].bounderyBottom()) {
-            value += 8;
-            if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == brancas) {
-                break;
-            } if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == pretas) {
-                movement(value, brancas);
-                break;
-            }
-            movement(value, brancas)
-        }
-        value = initial;
-        while (!boardgame[value].bounderyTop()) {
-            value -= 8;
-            if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == brancas) {
-                break;
-            } if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == pretas) {
-                movement(value, brancas);
-                break;
-            }
-            movement(value, brancas);
+        var movimentos = calculateRookDestinations(value, brancas)
+        for (var i = 0; i < movimentos.length; i++) {
+            movement(movimentos[i], brancas)
         }
     }
 }
@@ -1164,52 +1154,17 @@ class whiteKing extends piece {
     erasePiece(ctx) {
         ctx.clearRect(this.x, this.y, 35, 18);
     }
-    calculateMoves(index, color){
-        return []
+    calculateMoves(index, color) {
+        return calculateKingDestinations(index, color)
     }
     move(value) {
-        var initial = value;
-        if (!boardgame[value].bounderyRight()) {
-            value++;
-            movement(value, brancas)
-        }
-        value = initial;
-        if (!boardgame[value].bounderyLeft()) {
-            value--;
-            movement(value, brancas)
-        }
-        value = initial;
-        if (!boardgame[value].bounderyBottom()) {
-            value += 8;
-            movement(value, brancas)
-        }
-        value = initial;
-        if (!boardgame[value].bounderyTop()) {
-            value -= 8;
-            movement(value, brancas)
-        }
-        value = initial;
-        if (!boardgame[value].bounderyTop() && !boardgame[value].bounderyLeft()) {
-            value -= 9;
-            movement(value, brancas)
-        }
-        value = initial;
-        if (!boardgame[value].bounderyTop() && !boardgame[value].bounderyRight()) {
-            value -= 7;
-            movement(value, brancas)
-        }
-        value = initial;
-        if (!boardgame[value].bounderyBottom() && !boardgame[value].bounderyRight()) {
-            value += 9;
-            movement(value, brancas)
-        }
-        value = initial;
-        if (!boardgame[value].bounderyBottom() && !boardgame[value].bounderyLeft()) {
-            value += 7;
-            movement(value, brancas)
-        }
-        value = initial;
+        var movimentos = calculateKingDestinations(value, brancas)
+        for (var i = 0; i < movimentos.length; i++) {
+            if (!isCasaSobAtaque(movimentos[i], pretas)) {
 
+                movement(movimentos[i], brancas)
+            }
+        }
         if (this.firstmove === true && boardgame[value + 1].getPiece() == null && boardgame[value + 2].getPiece() == null) {
             checkWhiteRoqueMove(value + 3, value + 2);
         }
@@ -1254,130 +1209,14 @@ class whiteBishop extends piece {
     erasePiece(ctx) {
         ctx.clearRect(this.x, this.y, 35, 18);
     }
-    calculateMoves(index, color){
-        return calculateBishopDestinations(index,color)
+    calculateMoves(index, color) {
+        return calculateBishopDestinations(index, color)
     }
     move(value) {
 
-        var initial = value;// valor inicial, posição da peça no Array
-
-        //valores para ajuste de posição
-        const bounderyRightValueAjustDown = value + 7;
-        const bounderyRightValueAjustUp = value - 9;
-        const bounderyLeftValueAjustDown = value + 9;
-        const bounderyLeftValueAjustUp = value - 7;
-
-        //---------------------------------------------------------------------------------------
-        //ajusta posição se a peça está na borda direita
-        if (boardgame[value].bounderyRight() && bounderyRightValueAjustDown < boardgame.length) {
-            if (boardgame[bounderyRightValueAjustDown].getPiece() == null) {
-                movement(bounderyRightValueAjustDown, brancas)
-                value = bounderyRightValueAjustDown;
-
-            } if (boardgame[bounderyRightValueAjustDown].getPiece() != null && boardgame[bounderyRightValueAjustDown].getPiece().getTeam() == pretas) {
-                movement(bounderyRightValueAjustDown, brancas);
-            }
-        }           //movimenta para a diagonal até chegar a borda esquerda abaixo
-        while (!boardgame[value].bounderyRight() && !boardgame[value].bounderyBottom()) {
-            if (boardgame[value].bounderyLeft() || boardgame[value].bounderyRight()) {
-                break;
-            }
-            value += 7;
-            if (boardgame[value].getPiece() != null) {
-                if (boardgame[value].getPiece().getTeam() == brancas) {
-                    break;
-                } if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == pretas) {
-                    movement(value, brancas);
-                    break;
-                }
-            }
-            movement(value, brancas);
-        }
-        //----------------------------------------------------------------------------------------
-        value = initial;//volta a posição inicial
-
-        //ajusta posição se a peça está na borda esquerda
-        if (boardgame[value].bounderyLeft() && bounderyLeftValueAjustDown < boardgame.length) {
-            if (boardgame[bounderyLeftValueAjustDown].getPiece() == null) {
-                movement(bounderyLeftValueAjustDown, brancas)
-                value = bounderyLeftValueAjustDown;
-
-            } if (boardgame[bounderyLeftValueAjustDown].getPiece() != null && boardgame[bounderyLeftValueAjustDown].getPiece().getTeam() == pretas) {
-                movement(bounderyLeftValueAjustDown, brancas);
-            }
-        }               //movimenta para a diagonal até chegar a borda direita abaixo
-        while (!boardgame[value].bounderyRight() && !boardgame[value].bounderyBottom()) {
-            if (boardgame[value].bounderyLeft() || boardgame[value].bounderyRight()) {
-                break;
-            }
-            value += 9;
-            if (boardgame[value].getPiece() != null) {
-                if (boardgame[value].getPiece().getTeam() === brancas) {
-                    break;
-                } if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == pretas) {
-                    movement(value, brancas);
-                    break;
-                }
-            }
-            movement(value, brancas);
-        }
-        //------------------------------------------------------------------------------------------
-        value = initial;//volta a posição inicial
-
-        //ajusta posição se a peça está na borda esquerda
-        if (boardgame[value].bounderyLeft() && bounderyLeftValueAjustUp >= 0) {
-            if (boardgame[bounderyLeftValueAjustUp].getPiece() == null) {
-                movement(bounderyLeftValueAjustUp, brancas)
-                value = bounderyLeftValueAjustUp;
-
-            } if (boardgame[bounderyLeftValueAjustUp].getPiece() != null && boardgame[bounderyLeftValueAjustUp].getPiece().getTeam() == pretas) {
-                movement(bounderyLeftValueAjustUp, brancas);
-            }
-
-        }               //movimenta para a diagonal até chegar a borda direita acima
-        while (!boardgame[value].bounderyLeft() && !boardgame[value].bounderyTop()) {
-            if (boardgame[value].bounderyLeft() || boardgame[value].bounderyRight()) {
-                break;
-            }
-            value -= 7;
-            if (boardgame[value].getPiece() != null) {
-                if (boardgame[value].getPiece().getTeam() == brancas) {
-                    break;
-                } if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == pretas) {
-                    movement(value, brancas);
-                    break;
-                }
-            }
-            movement(value, brancas);
-        }
-        //-----------------------------------------------------------------------------------------
-        value = initial;//volta a posição inicial
-
-        //ajusta posição se a peça está na borda direita
-        if (boardgame[value].bounderyRight() && bounderyRightValueAjustUp >= 0) {
-            if (boardgame[bounderyRightValueAjustUp].getPiece() == null) {
-                movement(bounderyRightValueAjustUp, brancas)
-                value = bounderyRightValueAjustUp;
-
-            } if (boardgame[bounderyRightValueAjustUp].getPiece() != null && boardgame[bounderyRightValueAjustUp].getPiece().getTeam() == pretas) {
-                movement(bounderyRightValueAjustUp, brancas);
-            }
-        }
-        //movimenta para a diagonal até chegar a borda esquerda acima  
-        while (!boardgame[value].bounderyLeft() && !boardgame[value].bounderyTop()) {
-            if (boardgame[value].bounderyLeft() || boardgame[value].bounderyRight()) {
-                break;
-            }
-            value -= 9;
-            if (boardgame[value].getPiece() != null) {
-                if (boardgame[value].getPiece().getTeam() == brancas) {
-                    break;
-                } if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == pretas) {
-                    movement(value, brancas);
-                    break;
-                }
-            }
-            movement(value, brancas);
+        var movimentos = calculateBishopDestinations(value, brancas)
+        for (var i = 0; i < movimentos.length; i++) {
+            movement(movimentos[i], brancas)
         }
     }
 }
@@ -1417,42 +1256,15 @@ class whiteKnight extends piece {
     erasePiece(ctx) {
         ctx.clearRect(this.x, this.y, 35, 18);
     }
-    calculateMoves(index, color){
-        return calculateKnightDestinations(index,color)
+    calculateMoves(index, color) {
+        return calculateKnightDestinations(index, color)
     }
     move(value) {
 
-        //movimento a direita-----------------------------------------
-        if (value + 1 < boardgame.length) {
-            if (!boardgame[value + brancas].bounderyRight() && !boardgame[value].bounderyRight()) {
-                movement(value + 8 + 2, brancas);//L aberto abaixo a direita
-                movement(value - 8 + 2, brancas);//L aberto acima a direita
-            }
-
-            if (!boardgame[value].bounderyRight()) {
-                movement(value + 16 + 1, brancas);//L fechado abaixo a direita
-                movement(value - 16 + 1, brancas);//L fechado acima a direita
-            }
+        var movimentos = calculateKnightDestinations(value, brancas)
+        for (var i = 0; i < movimentos.length; i++) {
+            movement(movimentos[i], brancas)
         }
-        //------------------------------------------------------------
-
-        //movimento a esquerda----------------------------------------
-        if (value - 1 > 0) {
-            if (!boardgame[value - 1].bounderyLeft() && !boardgame[value].bounderyLeft()) {
-                if ((value + 8) < boardgame.length) { //ajuste para não causar NullPointer
-                    movement(value + 8 - 2, brancas);
-                }//L aberto abaixo a esquerda
-                movement(value - 8 - 2, brancas);//L aberto acima a esquerda
-            }
-        }
-        if (!boardgame[value].bounderyLeft()) {
-            if ((value + 16) < boardgame.length) { //ajuste para não causar NullPointer
-                movement(value + 16 - 1, brancas);
-            }//L fechado abaixo a esquerda
-            movement(value - 16 - 1, brancas);//L fechado acima a esquerda
-        }
-
-        //------------------------------------------------------------
     }
 }
 class whiteQueen extends piece {
@@ -1491,186 +1303,13 @@ class whiteQueen extends piece {
     erasePiece(ctx) {
         ctx.clearRect(this.x, this.y, 35, 18);
     }
-    calculateMoves(index, color){
-        return []
+    calculateMoves(index, color) {
+        return calculateQueenDestinations(index, color);
     }
     move(value) {
-        //================================== Movimentação horizontal e vertical ===================================
-        var initial = value;
-        while (!boardgame[value].bounderyRight()) {
-            value++;
-            if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == brancas) {
-                break;
-            } if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == pretas) {
-                movement(value, brancas);
-                break;
-            }
-            movement(value, brancas)
-        }
-
-
-        value = initial;
-        while (!boardgame[value].bounderyLeft()) {
-            value--;
-            if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == brancas) {
-                break;
-            } if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == pretas) {
-                movement(value, brancas);
-                break;
-            }
-            movement(value, brancas);
-        }
-
-
-        value = initial;
-        while (!boardgame[value].bounderyBottom()) {
-            value += 8;
-            if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == brancas) {
-                break;
-            } if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == pretas) {
-                movement(value, brancas);
-                break;
-            }
-            movement(value, brancas)
-        }
-
-
-        value = initial;
-        while (!boardgame[value].bounderyTop()) {
-            value -= 8;
-            if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == brancas) {
-                break;
-            } if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == pretas) {
-                movement(value, brancas);
-                break;
-            }
-            movement(value, brancas);
-        }
-
-        value = initial;
-
-        //===================================== Movimentação diagonal =====================================
-
-        var initial2 = initial;
-
-        //valores para ajuste de posição
-        const bounderyRightValueAjustDown = value + 7;
-        const bounderyRightValueAjustUp = value - 9;
-        const bounderyLeftValueAjustDown = value + 9;
-        const bounderyLeftValueAjustUp = value - 7;
-
-        //---------------------------------------------------------------------------------------
-        //ajusta posição se a peça está na borda direita
-        if (boardgame[initial2].bounderyRight() && bounderyRightValueAjustDown < boardgame.length) {
-            if (boardgame[bounderyRightValueAjustDown].getPiece() == null) {
-                movement(bounderyRightValueAjustDown, brancas)
-                initial2 = bounderyRightValueAjustDown;
-
-            } if (boardgame[bounderyRightValueAjustDown].getPiece() != null && boardgame[bounderyRightValueAjustDown].getPiece().getTeam() == pretas) {
-                movement(bounderyRightValueAjustDown, brancas);
-            }
-        }               //movimenta para a diagonal até chegar a borda esquerda abaixo
-        while (!boardgame[initial2].bounderyRight() && !boardgame[initial2].bounderyBottom()) {
-            if (boardgame[initial2].bounderyLeft() || boardgame[initial2].bounderyRight()) {
-                break;
-            }
-            initial2 += 7;
-            if (boardgame[initial2].getPiece() != null) {
-                if (boardgame[initial2].getPiece().getTeam() == brancas) {
-                    break;
-                } if (boardgame[initial2].getPiece() != null && boardgame[initial2].getPiece().getTeam() == pretas) {
-                    movement(initial2, brancas);
-                    break;
-                }
-            }
-            movement(initial2, brancas);
-        }
-        //----------------------------------------------------------------------------------------
-        initial2 = initial;//volta a posição inicial
-
-        //ajusta posição se a peça está na borda esquerda
-        if (boardgame[initial2].bounderyLeft() && bounderyLeftValueAjustDown < boardgame.length) {
-            if (boardgame[bounderyLeftValueAjustDown].getPiece() == null) {
-                movement(bounderyLeftValueAjustDown, brancas)
-                initial2 = bounderyLeftValueAjustDown;
-
-            } if (boardgame[bounderyLeftValueAjustDown].getPiece() != null && boardgame[bounderyLeftValueAjustDown].getPiece().getTeam() == pretas) {
-                movement(bounderyLeftValueAjustDown, brancas);
-            }
-
-        }               //movimenta para a diagonal até chegar a borda direita abaixo
-        while (!boardgame[initial2].bounderyRight() && !boardgame[initial2].bounderyBottom()) {
-            if (boardgame[initial2].bounderyLeft() || boardgame[initial2].bounderyRight()) {
-                break;
-            }
-            initial2 += 9;
-            if (boardgame[initial2].getPiece() != null) {
-                if (boardgame[initial2].getPiece().getTeam() === brancas) {
-                    break;
-                } if (boardgame[initial2].getPiece() != null && boardgame[initial2].getPiece().getTeam() == pretas) {
-                    movement(initial2, brancas);
-                    break;
-                }
-            }
-            movement(initial2, brancas);
-        }
-        //------------------------------------------------------------------------------------------
-        initial2 = initial;//volta a posição inicial
-
-        //ajusta posição se a peça está na borda esquerda
-        if (boardgame[initial2].bounderyLeft() && bounderyLeftValueAjustUp >= 0) {
-            if (boardgame[bounderyLeftValueAjustUp].getPiece() == null) {
-                movement(bounderyLeftValueAjustUp, brancas)
-                initial2 = bounderyLeftValueAjustUp;
-
-            } if (boardgame[bounderyLeftValueAjustUp].getPiece() != null && boardgame[bounderyLeftValueAjustUp].getPiece().getTeam() == pretas) {
-                movement(bounderyLeftValueAjustUp, brancas);
-            }
-
-        }               //movimenta para a diagonal até chegar a borda direita acima
-        while (!boardgame[initial2].bounderyLeft() && !boardgame[initial2].bounderyTop()) {
-            if (boardgame[initial2].bounderyLeft() || boardgame[initial2].bounderyRight()) {
-                break;
-            }
-            initial2 -= 7;
-            if (boardgame[initial2].getPiece() != null) {
-                if (boardgame[initial2].getPiece().getTeam() == brancas) {
-                    break;
-                } if (boardgame[initial2].getPiece() != null && boardgame[initial2].getPiece().getTeam() == pretas) {
-                    movement(initial2, brancas);
-                    break;
-                }
-            }
-            movement(initial2, brancas);
-        }
-        //-----------------------------------------------------------------------------------------
-        initial2 = initial//volta a posição inicial
-
-        //ajusta posição se a peça está na borda direita
-        if (boardgame[initial2].bounderyRight() && bounderyRightValueAjustUp >= 0) {
-            if (boardgame[bounderyRightValueAjustUp].getPiece() == null) {
-                movement(bounderyRightValueAjustUp, brancas)
-                initial2 = bounderyRightValueAjustUp;
-
-            } if (boardgame[bounderyRightValueAjustUp].getPiece() != null && boardgame[bounderyRightValueAjustUp].getPiece().getTeam() == pretas) {
-                movement(bounderyRightValueAjustUp, brancas);
-            }
-
-        }               //movimenta para a diagonal até chegar a borda esquerda acima  
-        while (!boardgame[initial2].bounderyLeft() && !boardgame[initial2].bounderyTop()) {
-            if (boardgame[initial2].bounderyLeft() || boardgame[initial2].bounderyRight()) {
-                break;
-            }
-            initial2 -= 9;
-            if (boardgame[initial2].getPiece() != null) {
-                if (boardgame[initial2].getPiece().getTeam() == brancas) {
-                    break;
-                } if (boardgame[initial2].getPiece() != null && boardgame[initial2].getPiece().getTeam() == pretas) {
-                    movement(initial2, brancas);
-                    break;
-                }
-            }
-            movement(initial2, brancas);
+        var movimentos = calculateQueenDestinations(value, brancas)
+        for (var i = 0; i < movimentos.length; i++) {
+            movement(movimentos[i], brancas)
         }
     }
 
@@ -1726,22 +1365,19 @@ class whitePawn extends piece {
         ctx.clearRect(this.x, this.y, 35, 18);
     }
     calculateMoves(value, color) {
-        return []
+        var movesAtackPawn = calculatePawnDestinations(value, color, this.firstmove)
+        return movesAtackPawn[1];
     }
     move(value) {
-        //movimento para a frente
-        if (this.firstmove == true && boardgame[value - 8].getPiece() == null && boardgame[value - 16].getPiece() == null) {
-            movement(value - 8, brancas);
-            movement(value - 16, brancas);
-        } else if (boardgame[value - 8].getPiece() == null) {
-            movement(value - 8, brancas);
+        var movimentos = calculatePawnDestinations(value, brancas, this.firstmove)
+        var movefowards = movimentos[0];
+        var moveAtack = movimentos[1]
+        for (var i = 0; i < movefowards.length; i++) {
+            movement(movefowards[i], brancas)
         }
-        //ataques na diagonal 
-        if (!boardgame[value].bounderyRight()) {//se não tiver na beira direita, para não quebrar a linha
-            pawnAttack(value - 7, brancas);
-        }
-        if (!boardgame[value].bounderyLeft()) {//se não tiver na beira esquerda, para não quebrar a linha
-            pawnAttack(value - 9, brancas);
+        for (let i = 0; i < moveAtack.length; i++) {
+            pawnAttack(moveAtack[i], brancas)
+
         }
         checkBlackPawnEnPassant(value + 1);
         checkBlackPawnEnPassant(value - 1);
@@ -1794,53 +1430,13 @@ class blackCastle extends piece {
     erasePiece(ctx) {
         ctx.clearRect(this.x, this.y, 35, 18);
     }
-    calculateMoves(index, color){
-        return []
+    calculateMoves(index, color) {
+        return calculateRookDestinations(index, color);
     }
     move(value) {
-        var initial = value;
-        while (!boardgame[value].bounderyRight()) {
-            value++;
-            if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == pretas) {
-                break;
-            } if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == brancas) {
-                movement(value, pretas);
-                break;
-            }
-            movement(value, pretas)
-        }
-        value = initial;
-        while (!boardgame[value].bounderyLeft()) {
-            value--;
-            if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == pretas) {
-                break;
-            } if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == brancas) {
-                movement(value, pretas);
-                break;
-            }
-            movement(value, pretas);
-        }
-        value = initial;
-        while (!boardgame[value].bounderyBottom()) {
-            value += 8;
-            if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == pretas) {
-                break;
-            } if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == brancas) {
-                movement(value, pretas);
-                break;
-            }
-            movement(value, pretas)
-        }
-        value = initial;
-        while (!boardgame[value].bounderyTop()) {
-            value -= 8;
-            if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == pretas) {
-                break;
-            } if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == brancas) {
-                movement(value, pretas);
-                break;
-            }
-            movement(value, pretas);
+        var movimentos = calculateRookDestinations(value, pretas)
+        for (var i = 0; i < movimentos.length; i++) {
+            movement(movimentos[i], pretas)
         }
     }
 }
@@ -1888,56 +1484,20 @@ class blackKing extends piece {
     erasePiece(ctx) {
         ctx.clearRect(this.x, this.y, 35, 18);
     }
-    calculateMoves(index, color){
-        return []
+    calculateMoves(index, color) {
+        return calculateKingDestinations(index, color);
     }
     move(value) {
-        var initial = value;
-        if (!boardgame[value].bounderyRight()) {
-            value++;
-            movement(value, pretas)
+        var movimentos = calculateKingDestinations(value, pretas)
+        for (var i = 0; i < movimentos.length; i++) {
+            if (!isCasaSobAtaque(movimentos[i], brancas)) {
+                movement(movimentos[i], pretas)
+            }
         }
-        value = initial;
-        if (!boardgame[value].bounderyLeft()) {
-            value--;
-            movement(value, pretas)
-        }
-        value = initial;
-        if (!boardgame[value].bounderyBottom()) {
-            value += 8;
-            movement(value, pretas)
-        }
-        value = initial;
-        if (!boardgame[value].bounderyTop()) {
-            value -= 8;
-            movement(value, pretas)
-        }
-        value = initial;
-        if (!boardgame[value].bounderyTop() && !boardgame[value].bounderyLeft()) {
-            value -= 9;
-            movement(value, pretas)
-        }
-        value = initial;
-        if (!boardgame[value].bounderyTop() && !boardgame[value].bounderyRight()) {
-            value -= 7;
-            movement(value, pretas)
-        }
-        value = initial;
-        if (!boardgame[value].bounderyBottom() && !boardgame[value].bounderyRight()) {
-            value += 9;
-            movement(value, pretas)
-        }
-        value = initial;
-        if (!boardgame[value].bounderyBottom() && !boardgame[value].bounderyLeft()) {
-            value += 7;
-            movement(value, pretas)
-        }
-        value = initial;
-
-        if (this.firstmove == true && boardgame[value + 1].getPiece() == null && boardgame[value + 2].getPiece() == null) {
+        if (this.firstmove === true && boardgame[value + 1].getPiece() == null && boardgame[value + 2].getPiece() == null) {
             checkBlackRoqueMove(value + 3, value + 2);
         }
-        if (this.firstmove == true && boardgame[value - 1].getPiece() == null && boardgame[value - 2].getPiece() == null && boardgame[value - 3].getPiece() == null) {
+        if (this.firstmove === true && boardgame[value - 1].getPiece() == null && boardgame[value - 2].getPiece() == null && boardgame[value - 3].getPiece() == null) {
             checkBlackRoqueMove(value - 4, value - 2);
         }
 
@@ -1979,130 +1539,13 @@ class blackBishop extends piece {
     erasePiece(ctx) {
         ctx.clearRect(this.x, this.y, 35, 18);
     }
-    calculateMoves(index, color){
-        return calculateBishopDestinations(index,color)
+    calculateMoves(index, color) {
+        return calculateBishopDestinations(index, color)
     }
     move(value) {
-        var initial = value;// valor inicial, posição da peça no Array
-
-        //valores para ajuste de posição
-        const bounderyRightValueAjustDown = value + 7;
-        const bounderyRightValueAjustUp = value - 9;
-        const bounderyLeftValueAjustDown = value + 9;
-        const bounderyLeftValueAjustUp = value - 7;
-
-        //---------------------------------------------------------------------------------------
-        //ajusta posição se a peça está na borda direita
-        if (boardgame[value].bounderyRight() && bounderyRightValueAjustDown < boardgame.length) {
-            if (boardgame[bounderyRightValueAjustDown].getPiece() == null) {
-                movement(bounderyRightValueAjustDown, pretas)
-                value = bounderyRightValueAjustDown;
-
-            } if (boardgame[bounderyRightValueAjustDown].getPiece() != null && boardgame[bounderyRightValueAjustDown].getPiece().getTeam() == brancas) {
-                movement(bounderyRightValueAjustDown, pretas);
-            }
-        }           //movimenta para a diagonal até chegar a borda esquerda abaixo
-        while (!boardgame[value].bounderyRight() && !boardgame[value].bounderyBottom()) {
-            if (boardgame[value].bounderyLeft() || boardgame[value].bounderyRight()) {
-                break;
-            }
-            value += 7;
-            if (boardgame[value].getPiece() != null) {
-                if (boardgame[value].getPiece().getTeam() == pretas) {
-                    break;
-                } if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == brancas) {
-                    movement(value, pretas);
-                    break;
-                }
-            }
-            movement(value, pretas);
-        }
-        //----------------------------------------------------------------------------------------
-        value = initial;//volta a posição inicial
-
-        //ajusta posição se a peça está na borda esquerda
-        if (boardgame[value].bounderyLeft() && bounderyLeftValueAjustDown < boardgame.length) {
-            if (boardgame[bounderyLeftValueAjustDown].getPiece() == null) {
-                movement(bounderyLeftValueAjustDown, pretas)
-                value = bounderyLeftValueAjustDown;
-
-            } if (boardgame[bounderyLeftValueAjustDown].getPiece() != null && boardgame[bounderyLeftValueAjustDown].getPiece().getTeam() == brancas) {
-                movement(bounderyLeftValueAjustDown, pretas);
-            }
-
-        }               //movimenta para a diagonal até chegar a borda direita abaixo
-        while (!boardgame[value].bounderyRight() && !boardgame[value].bounderyBottom()) {
-            if (boardgame[value].bounderyLeft() || boardgame[value].bounderyRight()) {
-                break;
-            }
-            value += 9;
-            if (boardgame[value].getPiece() != null) {
-                if (boardgame[value].getPiece().getTeam() === pretas) {
-                    break;
-                } if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == brancas) {
-                    movement(value, pretas);
-                    break;
-                }
-            }
-            movement(value, pretas);
-        }
-        //------------------------------------------------------------------------------------------
-        value = initial;//volta a posição inicial
-
-        //ajusta posição se a peça está na borda esquerda
-        if (boardgame[value].bounderyLeft() && bounderyLeftValueAjustUp >= 0) {
-            if (boardgame[bounderyLeftValueAjustUp].getPiece() == null) {
-                movement(bounderyLeftValueAjustUp, pretas)
-                value = bounderyLeftValueAjustUp;
-
-            } if (boardgame[bounderyLeftValueAjustUp].getPiece() != null && boardgame[bounderyLeftValueAjustUp].getPiece().getTeam() == brancas) {
-                movement(bounderyLeftValueAjustUp, pretas);
-            }
-
-
-        }               //movimenta para a diagonal até chegar a borda direita acima
-        while (!boardgame[value].bounderyLeft() && !boardgame[value].bounderyTop()) {
-            if (boardgame[value].bounderyLeft() || boardgame[value].bounderyRight()) {
-                break;
-            }
-            value -= 7;
-            if (boardgame[value].getPiece() != null) {
-                if (boardgame[value].getPiece().getTeam() == pretas) {
-                    break;
-                } if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == brancas) {
-                    movement(value, pretas);
-                    break;
-                }
-            }
-            movement(value, pretas);
-        }
-        //-----------------------------------------------------------------------------------------
-        value = initial;//volta a posição inicial
-
-        //ajusta posição se a peça está na borda direita
-        if (boardgame[value].bounderyRight() && bounderyRightValueAjustUp >= 0) {
-            if (boardgame[bounderyRightValueAjustUp].getPiece() == null) {
-                movement(bounderyRightValueAjustUp, pretas)
-                value = bounderyRightValueAjustUp;
-            } if (boardgame[bounderyRightValueAjustUp].getPiece() != null && boardgame[bounderyRightValueAjustUp].getPiece().getTeam() == brancas) {
-                movement(bounderyRightValueAjustUp, pretas);
-            }
-        }
-        //movimenta para a diagonal até chegar a borda esquerda acima  
-        while (!boardgame[value].bounderyLeft() && !boardgame[value].bounderyTop()) {
-            if (boardgame[value].bounderyLeft() || boardgame[value].bounderyRight()) {
-                break;
-            }
-            value -= 9;
-            if (boardgame[value].getPiece() != null) {
-                if (boardgame[value].getPiece().getTeam() == pretas) {
-                    break;
-                } if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == brancas) {
-                    movement(value, pretas);
-                    break;
-                }
-            }
-            movement(value, pretas);
+        var movimentos = calculateBishopDestinations(value, pretas)
+        for (var i = 0; i < movimentos.length; i++) {
+            movement(movimentos[i], pretas)
         }
     }
 }
@@ -2142,43 +1585,15 @@ class blackKnight extends piece {
     erasePiece(ctx) {
         ctx.clearRect(this.x, this.y, 35, 18);
     }
-    calculateMoves(index,color){
-        return calculateKnightDestinations(index,color);
+    calculateMoves(index, color) {
+        return calculateKnightDestinations(index, color);
     }
     move(value) {
 
-        //movimento a direita-----------------------------------------
-        if (value + 1 < boardgame.length) {
-            if (!boardgame[value + 1].bounderyRight() && !boardgame[value].bounderyRight()) {
-                movement(value + 8 + 2, pretas);//L aberto abaixo a direita
-                movement(value - 8 + 2, pretas);//L aberto acima a direita
-            }
-
-            if (!boardgame[value].bounderyRight()) {
-                movement(value + 16 + 1, pretas);//L fechado abaixo a direita
-                movement(value - 16 + 1, pretas);//L fechado acima a direita
-            }
+        var movimentos = calculateKnightDestinations(value, pretas)
+        for (var i = 0; i < movimentos.length; i++) {
+            movement(movimentos[i], pretas)
         }
-        //------------------------------------------------------------
-
-        //movimento a esquerda----------------------------------------
-        if (value - 1 > 0) {
-            if (!boardgame[value - 1].bounderyLeft() && !boardgame[value].bounderyLeft()) {
-                if ((value + 8) < boardgame.length) { //ajuste para não causar NullPointer
-                    movement(value + 8 - 2, pretas);
-                }//L aberto abaixo a esquerda
-                movement(value - 8 - 2, pretas);//L aberto acima a esquerda
-            }
-        }
-        if (!boardgame[value].bounderyLeft()) {
-            if ((value + 16) < boardgame.length) {// ajuste para não causar NullPointer
-                movement(value + 16 - 1, pretas);
-            }//L fechado abaixo a esquerda
-            movement(value - 16 - 1, pretas);//L fechado acima a esquerda
-        }
-
-
-        //------------------------------------------------------------
     }
 }
 class blackQueen extends piece {
@@ -2217,186 +1632,13 @@ class blackQueen extends piece {
     erasePiece(ctx) {
         ctx.clearRect(this.x, this.y, 35, 18);
     }
-    calculateMoves(index, color){
-        return []
+    calculateMoves(index, color) {
+        return calculateQueenDestinations(index, color);
     }
     move(value) {
-        //================================== Movimentação horizontal e vertical ===================================
-        var initial = value;
-        while (!boardgame[value].bounderyRight()) {
-            value++;
-            if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == pretas) {
-                break;
-            } if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == brancas) {
-                movement(value, pretas);
-                break;
-            }
-            movement(value, pretas)
-        }
-
-
-        value = initial;
-        while (!boardgame[value].bounderyLeft()) {
-            value--;
-            if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == pretas) {
-                break;
-            } if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == brancas) {
-                movement(value, pretas);
-                break;
-            }
-            movement(value, pretas);
-        }
-
-
-        value = initial;
-        while (!boardgame[value].bounderyBottom()) {
-            value += 8;
-            if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == pretas) {
-                break;
-            } if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == brancas) {
-                movement(value, pretas);
-                break;
-            }
-            movement(value, pretas);
-        }
-
-
-        value = initial;
-        while (!boardgame[value].bounderyTop()) {
-            value -= 8;
-            if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == pretas) {
-                break;
-            } if (boardgame[value].getPiece() != null && boardgame[value].getPiece().getTeam() == brancas) {
-                movement(value, pretas);
-                break;
-            }
-            movement(value, pretas);
-        }
-
-        value = initial;
-
-        //===================================== Movimentação diagonal =====================================
-
-        var initial2 = initial;
-
-        //valores para ajuste de posição
-        const bounderyRightValueAjustDown = value + 7;
-        const bounderyRightValueAjustUp = value - 9;
-        const bounderyLeftValueAjustDown = value + 9;
-        const bounderyLeftValueAjustUp = value - 7;
-
-        //---------------------------------------------------------------------------------------
-        //ajusta posição se a peça está na borda direita
-        if (boardgame[initial2].bounderyRight() && bounderyRightValueAjustDown < boardgame.length) {
-            if (boardgame[bounderyRightValueAjustDown].getPiece() == null) {
-                movement(bounderyRightValueAjustDown, pretas)
-                initial2 = bounderyRightValueAjustDown;
-
-            } if (boardgame[bounderyRightValueAjustDown].getPiece() != null && boardgame[bounderyRightValueAjustDown].getPiece().getTeam() == brancas) {
-                movement(bounderyRightValueAjustDown, pretas);
-            }
-        }               //movimenta para a diagonal até chegar a borda esquerda abaixo
-        while (!boardgame[initial2].bounderyRight() && !boardgame[initial2].bounderyBottom()) {
-            if (boardgame[initial2].bounderyLeft() || boardgame[initial2].bounderyRight()) {
-                break;
-            }
-            initial2 += 7;
-            if (boardgame[initial2].getPiece() != null) {
-                if (boardgame[initial2].getPiece().getTeam() == pretas) {
-                    break;
-                } if (boardgame[initial2].getPiece() != null && boardgame[initial2].getPiece().getTeam() == brancas) {
-                    movement(initial2, pretas);
-                    break;
-                }
-            }
-            movement(initial2, pretas);
-        }
-        //----------------------------------------------------------------------------------------
-        initial2 = initial;//volta a posição inicial
-
-        //ajusta posição se a peça está na borda esquerda
-        if (boardgame[initial2].bounderyLeft() && bounderyLeftValueAjustDown < boardgame.length) {
-            if (boardgame[bounderyLeftValueAjustDown].getPiece() == null) {
-                movement(bounderyLeftValueAjustDown, pretas)
-                initial2 = bounderyLeftValueAjustDown;
-
-            } if (boardgame[bounderyLeftValueAjustDown].getPiece() != null && boardgame[bounderyLeftValueAjustDown].getPiece().getTeam() == brancas) {
-                movement(bounderyLeftValueAjustDown, pretas);
-            }
-
-        }               //movimenta para a diagonal até chegar a borda direita abaixo
-        while (!boardgame[initial2].bounderyRight() && !boardgame[initial2].bounderyBottom()) {
-            if (boardgame[initial2].bounderyLeft() || boardgame[initial2].bounderyRight()) {
-                break;
-            }
-            initial2 += 9;
-            if (boardgame[initial2].getPiece() != null) {
-                if (boardgame[initial2].getPiece().getTeam() == pretas) {
-                    break;
-                } if (boardgame[initial2].getPiece() != null && boardgame[initial2].getPiece().getTeam() == brancas) {
-                    movement(initial2, pretas);
-                    break;
-                }
-            }
-            movement(initial2, pretas);
-        }
-        //------------------------------------------------------------------------------------------
-        initial2 = initial;//volta a posição inicial
-
-        //ajusta posição se a peça está na borda esquerda
-        if (boardgame[initial2].bounderyLeft() && bounderyLeftValueAjustUp >= pretas) {
-            if (boardgame[bounderyLeftValueAjustUp].getPiece() == null) {
-                movement(bounderyLeftValueAjustUp, pretas)
-                initial2 = bounderyLeftValueAjustUp;
-
-            } if (boardgame[bounderyLeftValueAjustUp].getPiece() != null && boardgame[bounderyLeftValueAjustUp].getPiece().getTeam() == brancas) {
-                movement(bounderyLeftValueAjustUp, pretas);
-            }
-
-        }               //movimenta para a diagonal até chegar a borda direita acima
-        while (!boardgame[initial2].bounderyLeft() && !boardgame[initial2].bounderyTop()) {
-            if (boardgame[initial2].bounderyLeft() || boardgame[initial2].bounderyRight()) {
-                break;
-            }
-            initial2 -= 7;
-            if (boardgame[initial2].getPiece() != null) {
-                if (boardgame[initial2].getPiece().getTeam() == pretas) {
-                    break;
-                } if (boardgame[initial2].getPiece() != null && boardgame[initial2].getPiece().getTeam() == brancas) {
-                    movement(initial2, pretas);
-                    break;
-                }
-            }
-            movement(initial2, pretas);
-        }
-        //-----------------------------------------------------------------------------------------
-        initial2 = initial//volta a posição inicial
-
-        //ajusta posição se a peça está na borda direita
-        if (boardgame[initial2].bounderyRight() && bounderyRightValueAjustUp >= 0) {
-            if (boardgame[bounderyRightValueAjustUp].getPiece() == null) {
-                movement(bounderyRightValueAjustUp, pretas)
-                initial2 = bounderyRightValueAjustUp;
-
-            } if (boardgame[bounderyRightValueAjustUp].getPiece() != null && boardgame[bounderyRightValueAjustUp].getPiece().getTeam() == brancas) {
-                movement(bounderyRightValueAjustUp, pretas);
-            }
-
-        }               //movimenta para a diagonal até chegar a borda esquerda acima  
-        while (!boardgame[initial2].bounderyLeft() && !boardgame[initial2].bounderyTop()) {
-            if (boardgame[initial2].bounderyLeft() || boardgame[initial2].bounderyRight()) {
-                break;
-            }
-            initial2 -= 9;
-            if (boardgame[initial2].getPiece() != null) {
-                if (boardgame[initial2].getPiece().getTeam() == pretas) {
-                    break;
-                } if (boardgame[initial2].getPiece() != null && boardgame[initial2].getPiece().getTeam() == brancas) {
-                    movement(initial2, pretas);
-                    break;
-                }
-            }
-            movement(initial2, pretas);
+        var movimentos = calculateQueenDestinations(value, pretas)
+        for (var i = 0; i < movimentos.length; i++) {
+            movement(movimentos[i], pretas)
         }
     }
 }
@@ -2450,24 +1692,20 @@ class blackPawn extends piece {
     erasePiece(ctx) {
         ctx.clearRect(this.x, this.y, 35, 18);
     }
-    calculateMoves(index, color){
-        return []
+    calculateMoves(index, color) {
+        var moves = calculatePawnDestinations(index, color, this.firstmove)
+        return moves[1]
     }
     move(value) {
-        //movimento para a frente
+        var movimentos = calculatePawnDestinations(value, pretas, this.firstmove)
+        var movefowards = movimentos[0];
+        var moveAtack = movimentos[1]
+        for (var i = 0; i < movefowards.length; i++) {
+            movement(movefowards[i], pretas)
+        }
+        for (let i = 0; i < moveAtack.length; i++) {
+            pawnAttack(moveAtack[i], pretas)
 
-        if (this.firstmove == true && boardgame[value + 8].getPiece() == null && boardgame[value + 16].getPiece() == null) {
-            movement(value + 8, pretas);
-            movement(value + 16, pretas);
-        } else if (boardgame[value + 8].getPiece() == null) {
-            movement(value + 8, pretas);
-        }
-        //ataques na diagonal 
-        if (!boardgame[value].bounderyLeft()) {//se não tiver na beira esquerda, para não quebrar a linha
-            pawnAttack(value + 7, pretas);
-        }
-        if (!boardgame[value].bounderyRight()) {//se não tiver na beira direita, para não quebrar a linha
-            pawnAttack(value + 9, pretas);
         }
         checkWhitePawnEnPassant(value + 1);
         checkWhitePawnEnPassant(value - 1);
@@ -2515,10 +1753,10 @@ function play() {
     playClickSound();//som
     playMusic();
 
-    setTimeout(() => {
-        checkBestMoves();
+    // setTimeout(() => {
+    //     checkBestMoves();
 
-    }, 3000)
+    // }, 3000)
 
     //hover--------------------
     canvas.addEventListener("mousemove", (event) => {
@@ -2558,118 +1796,119 @@ function play() {
             y = -(event.clientY - (rect.bottom - 23)) * (canvas.height + 20) / rect.height;
         }
 
-        if (turno != timeIA) {
-            for (let i = 0; i < boardgame.length; i++) {
+        //if (turno !== timeIA) {
+        for (let i = 0; i < boardgame.length; i++) {
 
-                if (boardgame[i].calcDistance(x, y)) {
+            if (boardgame[i].calcDistance(x, y)) {
 
-                    //*****se a casa selecionada estiver preenchida, será guardada a peça e a casa atual 
-                    if (boardgame[i].isFilled()) {
-                        if (!verificaAtaque(i)) {// verifica se o movimento é um ataque. se não for, segue o fluxo.
-                            reset();
-                            selectedPiece = boardgame[i].getPiece(); //guarda a peça selecionada
-                            casaAtual = boardgame[i]; //guarda a casa da peça selecionada;
-                            casaAtualY = boardgame[i].y; //guarda a coordenada da peça selecionada
-                            if (verificarTurno()) {
-                                selectedPiece.move(i); //chama a função de movimentação da peça;
-                            }
+                //*****se a casa selecionada estiver preenchida, será guardada a peça e a casa atual 
+                if (boardgame[i].isFilled()) {
+                    if (!verificaAtaque(i)) {// verifica se o movimento é um ataque. se não for, segue o fluxo.
+                        reset();
+                        selectedPiece = boardgame[i].getPiece(); //guarda a peça selecionada
+                        casaAtual = boardgame[i]; //guarda a casa da peça selecionada;
+                        casaAtualY = boardgame[i].y; //guarda a coordenada da peça selecionada
+                        if (verificarTurno()) {
+                            selectedPiece.move(i); //chama a função de movimentação da peça;
                         }
+                    }
 
-                        //*****se a casa não tiver peça e estiver setada(verde), a peça guardada será colocada na casa clicada 
-                    } else {
-                        if (boardgame[i].getSetted()) {
+                    //*****se a casa não tiver peça e estiver setada(verde), a peça guardada será colocada na casa clicada 
+                } else {
+                    if (boardgame[i].getSetted()) {
+                        reset();
+                        casaDestino = boardgame[i];  //guarda a casa que será colocada a peça;
+                        casaDestinoY = boardgame[i].y; //guarda a coordenada da casa em que será colocada a peça
+                        casaAtual.clear(context); //apaga a imagem da peça na casa onde estava anteriormente.
+                        casaAtual.takeOffPiece(); //set null no atributo PEÇA da CASA anterior. 
+                        casaDestino.placePiece(instanciarClasse(selectedPiece, boardgame[i].x, boardgame[i].y));// instancia a peça na casa selecionada.
+
+                        // setTimeout(() => {
+                        //     checkBestMoves();
+
+                        // }, 4000)
+                        checkXeque();
+                        playPiece();//som
+
+                    }
+                    //********regra do Enpassant  
+                    if (boardgame[i].getEnpassant()) {
+                        reset();
+                        casaDestino = boardgame[i];  //guarda a casa que será colocada a peça;
+                        casaAtual.clear(context); //apaga a imagem da peça na casa onde estava anteriormente.
+                        casaAtual.takeOffPiece(); //set null no atributo PEÇA da CASA anterior.
+                        pontuacao(casaEnPassant.getPiece());//pontuação
+                        casaEnPassant.clear(context); //apaga a imagem da peça
+                        casaEnPassant.takeOffPiece(); //set null no atributo PEÇA da CASA.
+                        casaDestino.placePiece(instanciarClasse(selectedPiece, boardgame[i].x, boardgame[i].y));// instancia a peça na casa selecionada.
+                        // setTimeout(() => {
+                        //     checkBestMoves();
+
+                        // }, 4000)
+                        checkXeque();
+                        playTakePiece();
+
+                    }
+                    //********regra do Roque
+                    if (boardgame[i].getRoqueMove()) {
+
+                        //==================ROQUE DO LADO DO REI=====================
+
+                        if (boardgame[i].x > casaAtual.x) {
                             reset();
-                            casaDestino = boardgame[i];  //guarda a casa que será colocada a peça;
-                            casaDestinoY = boardgame[i].y; //guarda a coordenada da casa em que será colocada a peça
-                            casaAtual.clear(context); //apaga a imagem da peça na casa onde estava anteriormente.
-                            casaAtual.takeOffPiece(); //set null no atributo PEÇA da CASA anterior. 
-                            casaDestino.placePiece(instanciarClasse(selectedPiece, boardgame[i].x, boardgame[i].y));// instancia a peça na casa selecionada.
-                            setTimeout(() => {
-                                checkBestMoves();
-
-                            }, 4000)
-                            checkXeque();
-                            playPiece();//som
-
-                        }
-                        //********regra do Enpassant  
-                        if (boardgame[i].getEnpassant()) {
-                            reset();
-                            casaDestino = boardgame[i];  //guarda a casa que será colocada a peça;
                             casaAtual.clear(context); //apaga a imagem da peça na casa onde estava anteriormente.
                             casaAtual.takeOffPiece(); //set null no atributo PEÇA da CASA anterior.
-                            pontuacao(casaEnPassant.getPiece());//pontuação
-                            casaEnPassant.clear(context); //apaga a imagem da peça
-                            casaEnPassant.takeOffPiece(); //set null no atributo PEÇA da CASA.
-                            casaDestino.placePiece(instanciarClasse(selectedPiece, boardgame[i].x, boardgame[i].y));// instancia a peça na casa selecionada.
-                            setTimeout(() => {
-                                checkBestMoves();
+                            casaRoqueRei.clear(context);//apaga a torre da casa
+                            casaRoqueRei.takeOffPiece();//set null no atributo PEÇA da CASA.
 
-                            }, 4000)
+                            // instancia a peça na casa selecionada.
+                            boardgame[i].placePiece(instanciarClasse(selectedPiece, boardgame[i].x, boardgame[i].y));
+                            //instancia a torre na nova casa, usa função única *para não quebrar o sistema de turno
+                            boardgame[i - 1].placePiece(instanciarTorre(boardgame[i - 1].x, boardgame[i - 1].y));
+                            // setTimeout(() => {
+                            //     checkBestMoves();
+
+                            // }, 4000)
+                            playTakePiece();//som
                             checkXeque();
-                            playTakePiece();
-
+                            reset();
                         }
-                        //********regra do Roque
-                        if (boardgame[i].getRoqueMove()) {
 
-                            //==================ROQUE DO LADO DO REI=====================
+                        //==================ROQUE DO LADO DA DAMA=====================
 
-                            if (boardgame[i].x > casaAtual.x) {
-                                reset();
-                                casaAtual.clear(context); //apaga a imagem da peça na casa onde estava anteriormente.
-                                casaAtual.takeOffPiece(); //set null no atributo PEÇA da CASA anterior.
-                                casaRoqueRei.clear(context);//apaga a torre da casa
-                                casaRoqueRei.takeOffPiece();//set null no atributo PEÇA da CASA.
+                        if (boardgame[i].x < casaAtual.x) {
+                            reset();
+                            casaAtual.clear(context); //apaga a imagem da peça na casa onde estava anteriormente.
+                            casaAtual.takeOffPiece(); //set null no atributo PEÇA da CASA anterior.
+                            casaRoqueDama.clear(context);//apaga a torre da casa
+                            casaRoqueDama.takeOffPiece();//set null no atributo PEÇA da CASA.
 
-                                // instancia a peça na casa selecionada.
-                                boardgame[i].placePiece(instanciarClasse(selectedPiece, boardgame[i].x, boardgame[i].y));
-                                //instancia a torre na nova casa, usa função única *para não quebrar o sistema de turno
-                                boardgame[i - 1].placePiece(instanciarTorre(boardgame[i - 1].x, boardgame[i - 1].y));
-                                setTimeout(() => {
-                                    checkBestMoves();
+                            // instancia a peça na casa selecionada.
+                            boardgame[i].placePiece(instanciarClasse(selectedPiece, boardgame[i].x, boardgame[i].y));
+                            //instancia a torre na nova casa, usa função única *para não quebrar o sistema de turno
+                            boardgame[i + 1].placePiece(instanciarTorre(boardgame[i + 1].x, boardgame[i + 1].y));
+                            // setTimeout(() => {
+                            //     checkBestMoves();
 
-                                }, 4000)
-                                playTakePiece();//som
-                                checkXeque();
-                                reset();
-                            }
+                            // }, 4000)
 
-                            //==================ROQUE DO LADO DA DAMA=====================
-
-                            if (boardgame[i].x < casaAtual.x) {
-                                reset();
-                                casaAtual.clear(context); //apaga a imagem da peça na casa onde estava anteriormente.
-                                casaAtual.takeOffPiece(); //set null no atributo PEÇA da CASA anterior.
-                                casaRoqueDama.clear(context);//apaga a torre da casa
-                                casaRoqueDama.takeOffPiece();//set null no atributo PEÇA da CASA.
-
-                                // instancia a peça na casa selecionada.
-                                boardgame[i].placePiece(instanciarClasse(selectedPiece, boardgame[i].x, boardgame[i].y));
-                                //instancia a torre na nova casa, usa função única *para não quebrar o sistema de turno
-                                boardgame[i + 1].placePiece(instanciarTorre(boardgame[i + 1].x, boardgame[i + 1].y));
-                                setTimeout(() => {
-                                    checkBestMoves();
-
-                                }, 4000)
-
-                                playTakePiece();//som
-                                checkXeque();
-                                reset();
-                            }
-
-                        }
-                        else {
-                            //*****se a casa não esta ocupada nem setada(verde), só apaga as cores do tabuleiro
-                            reset()
+                            playTakePiece();//som
+                            checkXeque();
+                            reset();
                         }
 
                     }
+                    else {
+                        //*****se a casa não esta ocupada nem setada(verde), só apaga as cores do tabuleiro
+                        reset()
+                    }
 
                 }
+
             }
-            constRender(context, invertido);
         }
+        constRender(context, invertido);
+        //}
 
     })
 }

@@ -16,7 +16,10 @@ export const setWhiteCastleQueenSide = (value) => { canWhiteCastleQueenSide = va
 export const setBlackCastleKingSide = (value) => { canBlackCastleKingSide = value; };
 export const setBlackCastleQueenSide = (value) => { canBlackCastleQueenSide = value; };
 
-// TODO: implementar regras ENPASSANT
+/** 
+ * seta a string do index do boardgame onde tem movimento de enpassant
+ * @param {string} square  por exemplo "e7" boardgame[?].geIndex() 
+ * */ 
 export const setEnPassantSquare = (square) => { enPassantSquare = square; };
 
 

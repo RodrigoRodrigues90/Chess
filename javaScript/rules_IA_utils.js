@@ -2,7 +2,7 @@ import {
     setWhiteCastleKingSide, setWhiteCastleQueenSide,
     setBlackCastleKingSide, setBlackCastleQueenSide,
 } from "./fen_utils.js";
-import { boardgame } from "./jogo.js";
+import { boardgame, brancas } from "./jogo.js";
 
 // =================================================================
 // FUNÇÕES AUXILIARES PARA A IA
@@ -16,8 +16,9 @@ import { boardgame } from "./jogo.js";
 */
 export function placeNotationToSquare(index) {
     const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
-    const rank = Math.floor(index / 8) + 1; // 1 a 8
-    const file = files[index % 8]; // 'a' a 'h'
+    const arrayRank = Math.floor(index / 8); 
+    const rank = 8 - arrayRank; 
+    const file = files[index % 8]; 
     return file + rank; // Ex: 'e4'
 }
 
@@ -80,7 +81,6 @@ export function isCasaSobAtaque(targetIndex, colorEnemy) {
             
             // Obtém os destinos da peça inimiga (lista de numeros)
             const enemyMoves = boardgame[index].getPiece().calculateMoves(index, colorEnemy); 
-            
             // Checa se os destinos da peça inimiga inclui a casa alvo
             if (enemyMoves.includes(targetIndex)) {
                 return true; // Exixte um atacante nessa casa!
@@ -88,4 +88,25 @@ export function isCasaSobAtaque(targetIndex, colorEnemy) {
         }
     }
     return false; // Casa está segura!
+}
+
+/**
+ * recebe um objeto casa e procura ele na lista de casas do boardgame
+ * @param {casa} casa  a casa para que o peão moveu
+ * @param {boolean} color a cor da peça para saber a direção do cálculo
+ * R
+ */
+export function searchForIndexEnPassant(casa, color) {
+    var casaEnpassantIndex = ''
+    for (var i = 0; i <= boardgame.length ; i++) {
+        if (casa === boardgame[i]) {
+            if (color === brancas) {
+            casaEnpassantIndex = boardgame[i + 8].getIndex();
+            }else{
+                casaEnpassantIndex = boardgame[i - 8].getIndex();
+            }
+        };
+        
+    }
+    return casaEnpassantIndex;
 }

@@ -1,14 +1,16 @@
+import 'dotenv/config'; 
 import express from 'express';
 import cors from 'cors';
 import { GoogleGenAI } from '@google/genai';
 
 // --- Configuração da API ---
 if (!process.env.API_KEY_GEMINI) {
-    console.error("ERRO: A variável de ambiente GEMINI_API_KEY não está definida.");
+    console.error("ERRO: A variável de ambiente API_KEY_GEMINI não está definida.");
     process.exit(1);
 }
 
-const ai = new GoogleGenAI(process.env.API_KEY_GEMINI);
+const ai = new GoogleGenAI({
+    apiKey: process.env.API_KEY_GEMINI});
 const model = "gemini-2.5-flash";
 
 // Objeto para armazenar as sessões de chat ativas, indexadas pelo sessionId
@@ -31,9 +33,12 @@ function createOrGetChatSession(sessionId, cor_ia) {
     }
     // Instrução do sistema para o Gemini
     const systemInstruction = `
-        Você é um Grande Mestre de xadrez de nível 2800 ELO. Você joga como as peças ${cor_ia}.
-        Seu objetivo é jogar a melhor jogada estratégica e taticamente possível.
-        Responda SEMPRE e APENAS com a jogada no formato 'origemdestino' (ex: e2e4) e nada mais.
+        Você é um jogador de xadrez nivel 1800 ELO. Você joga como as peças ${cor_ia}.
+        Seu objetivo é jogar a melhor jogada estratégica possível.
+        Responda SOMENTE NA SUA VEZ e SEMPRE com a jogada no formato 'origemdestino' (ex: e2e4, e NUNCA use 'exd5' 
+        como movimento de captura, use e4d5 e tambem não descreva o movimento com a inicial da peça 
+        ex: 'nc8c6' somente responda no formato origemdestino 'c8c6'), 
+        e um comentario breve sobre a jogada.
         Use o histórico da conversa para manter a estratégia e o plano de jogo.
     `;
 
@@ -86,7 +91,8 @@ app.post('/api/jogada-ia', async (req, res) => {
         console.error("Erro na chamada à API Gemini:", error);
         // Em caso de erro, você pode querer remover a sessão para tentar novamente mais tarde.
         activeGameSessions.delete(sessionId);
-        res.status(500).json({ error: "Falha ao obter jogada da IA. Sessão reiniciada." });
+        window.alert(error.message)
+        location.reload()
     }
 });
 

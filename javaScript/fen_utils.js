@@ -64,9 +64,14 @@ export function gerarFENdoTabuleiro(boardgame, timeToMove, fullMoveNumber) {
     };
     
     // Itera as fileiras de 8 para 1 (Ordem FEN: 8/7/6/...)
+    // rankIndex = 7 representa Rank 8 do FEN, rankIndex = 0 representa Rank 1 do FEN.
     for (let rankIndex = 7; rankIndex >= 0; rankIndex--) {
         emptyCount = 0;
-        const startIndex = rankIndex * 8; 
+        
+        // *** CORREÇÃO AQUI: Adapta o cálculo para o mapeamento A8=0 do seu jogo ***
+        // Quando rankIndex=7 (Rank 8), o startIndex deve ser 0.
+        // Quando rankIndex=0 (Rank 1), o startIndex deve ser 56.
+        const startIndex = (7 - rankIndex) * 8; 
         
         for (let fileIndex = 0; fileIndex < 8; fileIndex++) {
             const squareIndex = startIndex + fileIndex;
@@ -108,10 +113,10 @@ export function gerarFENdoTabuleiro(boardgame, timeToMove, fullMoveNumber) {
     const castling = calcularStringRoqueFEN(); 
     
     // --- 4. Casa de En Passant ---
+    // enPassantSquare deve estar acessível por export no fen_utils.js
     const enPassant = enPassantSquare || '-'; 
     
     // --- 5. Contador de Meios-Lances (Simplificado para 0) ---
-    // Isto deve ser atualizado no jogo.js (resetado após captura ou mov. de peão)
     const halfMoveClock = 0; 
     
     // --- 6. Número do Lance Completo ---

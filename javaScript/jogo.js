@@ -1,5 +1,5 @@
 const canvas = document.querySelector("canvas");// tag canvas
-const context = canvas.getContext("2d"); // essa constante chama os metodos de desenho do canvas
+export const context = canvas.getContext("2d"); // essa constante chama os metodos de desenho do canvas
 const display1 = document.querySelector("#tempo1");//relogio de cima
 const display2 = document.querySelector("#tempo2");//relogio de baixo
 const placar1 = document.querySelector("#placar1");//placar 1
@@ -12,15 +12,14 @@ let invertido;// um Boolean: se escolher as pretas o tabuleiro é invertido;
 export const brancas = 1; //time brancas
 export const pretas = 0; //time pretas
 export let isxeque;
-import { calculateBishopDestinations, calculateKingDestinations, calculateKnightDestinations, calculatePawnDestinations, calculateQueenDestinations, calculateRookDestinations } from "./calculate_moves_utils.js";
+import { calculateBishopDestinations, calculateKingDestinations, calculateKnightDestinations, calculatePawnDestinations, calculateQueenDestinations, calculateRookDestinations, extrairNotacaoDaResposta } from "./calculate_moves_utils.js";
 import { setEnPassantSquare, gerarFENdoTabuleiro } from "./fen_utils.js";
-import { nullCastleIAByMovePiece, placeNotationToSquare, isCasaSobAtaque, searchForIndexEnPassant } from "./rules_IA_utils.js";
+import { nullCastleIAByMovePiece, placeNotationToSquare, isCasaSobAtaque, searchForIndexEnPassant, executeRoque, movePieceTransfer, putMessageOnDisplay , isRoqueLegal } from "./rules_IA_utils.js";
 //import { gerarFENdoTabuleiro } from "./fen_utils.js";
 
 //------variaveis IA--------//
 let movimentosArray = new Array(10000)
 let movimentoEncontrado;
-let placarIA;
 let timeIA;
 //-------------------------//
 
@@ -63,8 +62,111 @@ function selecionarMovimentoAleatorio(array) {
     return array[indiceAleatorio];
 }
 
+//==========GEMINI==========//
+//==========================//
+
+let partidaId = null; // Variável para armazenar o ID único da partida
+
+function iniciarNovaPartida() {
+    // Gerar um ID único para a nova partida 
+    partidaId = Date.now().toString();
+    console.log(`Nova partida iniciada com ID: ${partidaId}`);
+}
+function callIAGemini() {
+    const estadoFEN = gerarFENdoTabuleiro(boardgame, turno, 1);
+    const corIA = timeIA === pretas ? "Pretas" : "Brancas";
+    console.log(`Chamando IA Gemini para o estado FEN: ${estadoFEN} | Cor da IA: ${corIA} | ID da Partida: ${partidaId}`);
+    fetch('http://localhost:3000/api/jogada-ia', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            fen: estadoFEN,
+            cor_ia: corIA,
+            sessionId: partidaId // O ID da sessão é a chave para o contexto!
+        })
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.movimento) {
+                aplicarMovimentoRecebido(data.movimento);
+            }
+        })
+        .catch(error => {
+            window.alert("Erro de comunicação com o Gemini.", error);
+            // location.reload()
+        });
+}
+function recallGemini() {
+    const estadoFEN = gerarFENdoTabuleiro(boardgame, turno, 1);
+    const corIA = timeIA === pretas ? "Pretas" : "Brancas";
+    const message_correction = 'o seu movimento não é legal, pense de novo e responda apenas com a notação algébrica do movimento. Exemplo: e7e5, g1f3';
+    console.log(`Chamando IA Gemini para o estado FEN: ${estadoFEN} | Cor da IA: ${corIA} | ID da Partida: ${partidaId}`);
+    fetch('http://localhost:3000/api/jogada-ia', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            fen: estadoFEN,
+            cor_ia: corIA,
+            msg: message_correction,
+            sessionId: partidaId // O ID da sessão é a chave para o contexto!
+        })
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.movimento) {
+                aplicarMovimentoRecebido(data.movimento);
+            }
+        })
+        .catch(error => {
+            window.alert("Erro de comunicação com o Gemini.", error);
+            location.reload()
+        });
+}
+
+/**
+ * Executa um movimento recebido como string na notação algébrica (ex: "g1f3")
+ * recebido do Gemini, e renderiza a mudança no canvas.
+ * @param {string} textoBrutoIA - A string do movimento, ex: "e7e5", "g1f3", "a7a8q" (para promoção).
+ */
+function aplicarMovimentoRecebido(textoBrutoIA) {
+    // 1. Extração Limpa do Lance
+    const movimento_IA = extrairNotacaoDaResposta(textoBrutoIA);
+    let from, to, pieceIA;
+    if (movimento_IA === null) {
+        console.warn("Não foi possível processar a jogada da IA, retornando.");
+        return;
+    }
+    //2. separa origem de destino
+    const origemNotacao = movimento_IA.substring(0, 2);
+    const destinoNotacao = movimento_IA.substring(2, 4);
+
+    // 3. Encontra os objetos CASA
+    from = boardgame.find(casa => casa.getIndex() === origemNotacao)// casa de origem
+    to = boardgame.find(casa => casa.getIndex() === destinoNotacao) // casa de destino
+    pieceIA = from.getPiece();
+
+    //4. EXECUÇÃO DO MOVIMENTO
+    const fromIndex = boardgame.indexOf(from)
+    const toIndex = boardgame.indexOf(to);
+    //4.1 se for um movimento de roque
+    if (pieceIA.getName() === 'Rei' && Math.abs(fromIndex - toIndex) >= 2 && isRoqueLegal(fromIndex, toIndex, pieceIA.getTeam())) {
+        executeRoque(fromIndex, toIndex);
+        
+    } else {
+        //4.2 se for movimento comum
+        movePieceTransfer(fromIndex, toIndex);
+    }
+
+
+    nullCastleIAByMovePiece(pieceIA);
+    checkXeque();
+    trocarTurno();
+    startTimer()
+    constRender(context, invertido);
+    putMessageOnDisplay(textoBrutoIA);
+
+}
 function checkBestMoves() {
-    //console.log(gerarFENdoTabuleiro(boardgame, turno, 1));
     if (timeIA == turno) {
         for (let index = 0; index < boardgame.length; index++) {
 
@@ -140,8 +242,6 @@ let casaDestinoY;
 let selectedPiece;
 let pecaEliminada;
 let casaEnPassant;
-let casaEnPassantSquare;
-let casaRoqueMove;
 let casaRoqueDama;
 let casaRoqueRei;
 let torreDoRoque;
@@ -349,7 +449,7 @@ function checkXeque() {//conferir se o lance está em xeque
     reset();
     return isxeque;
 }
-function checkXequeMate(obj) {//xeque-mate!!!
+export function checkXequeMate(obj) {//xeque-mate!!!
     var Bking = new blackKing(0, 0);
     var Wking = new whiteKing(0, 0);
 
@@ -546,15 +646,15 @@ function verificaAtaque(valor) {
         boardgame[valor].takeOffPiece();
         pontuacao(pecaEliminada);
         boardgame[valor].placePiece(instanciarClasse(selectedPiece, boardgame[valor].x, boardgame[valor].y));
-        // setTimeout(() => {
-        //     checkBestMoves();
-
-        // }, 3000)
         checkXeque();
         valida = true;
         reset();
         playTakePiece();
         checkXequeMate(pecaEliminada);
+
+        if (turno === timeIA) {
+            callIAGemini();
+        }
     }
     return valida;
 }
@@ -575,9 +675,9 @@ function movement(value, thisTeam) {
         }
     }
 }
-function pontuacao(peace) {
+export function pontuacao(piace) {
     var ponto;
-    var obj = Object.prototype.constructor(peace);
+    var obj = Object.prototype.constructor(piace);
 
     if (Object.is(obj.constructor, new whitePawn(0, 0).constructor) || Object.is(obj.constructor, new blackPawn(0, 0).constructor)) {
         ponto = 10;
@@ -604,7 +704,7 @@ function pontuacao(peace) {
     }
     pontuar(ponto)
 }
-function pontuar(ponto) {
+export function pontuar(ponto) {
     if (ponto == undefined) {
         ponto = 0;
     }
@@ -1753,11 +1853,10 @@ function play() {
     playClickSound();//som
     playMusic();
 
-    // setTimeout(() => {
-    //     checkBestMoves();
-
-    // }, 3000)
-
+    iniciarNovaPartida()
+    if (timeIA === brancas) {
+        callIAGemini();
+    }
     //hover--------------------
     canvas.addEventListener("mousemove", (event) => {
         const rect = canvas.getBoundingClientRect();
@@ -1822,13 +1921,11 @@ function play() {
                         casaAtual.clear(context); //apaga a imagem da peça na casa onde estava anteriormente.
                         casaAtual.takeOffPiece(); //set null no atributo PEÇA da CASA anterior. 
                         casaDestino.placePiece(instanciarClasse(selectedPiece, boardgame[i].x, boardgame[i].y));// instancia a peça na casa selecionada.
-
-                        // setTimeout(() => {
-                        //     checkBestMoves();
-
-                        // }, 4000)
                         checkXeque();
                         playPiece();//som
+                        if (turno === timeIA) {
+                            callIAGemini();
+                        }
 
                     }
                     //********regra do Enpassant  
@@ -1841,12 +1938,12 @@ function play() {
                         casaEnPassant.clear(context); //apaga a imagem da peça
                         casaEnPassant.takeOffPiece(); //set null no atributo PEÇA da CASA.
                         casaDestino.placePiece(instanciarClasse(selectedPiece, boardgame[i].x, boardgame[i].y));// instancia a peça na casa selecionada.
-                        // setTimeout(() => {
-                        //     checkBestMoves();
-
-                        // }, 4000)
+                        console.log(gerarFENdoTabuleiro(boardgame, turno, 1));
                         checkXeque();
                         playTakePiece();
+                        if (turno === timeIA) {
+                            callIAGemini();
+                        }
 
                     }
                     //********regra do Roque
@@ -1865,12 +1962,11 @@ function play() {
                             boardgame[i].placePiece(instanciarClasse(selectedPiece, boardgame[i].x, boardgame[i].y));
                             //instancia a torre na nova casa, usa função única *para não quebrar o sistema de turno
                             boardgame[i - 1].placePiece(instanciarTorre(boardgame[i - 1].x, boardgame[i - 1].y));
-                            // setTimeout(() => {
-                            //     checkBestMoves();
-
-                            // }, 4000)
                             playTakePiece();//som
                             checkXeque();
+                            if (turno === timeIA) {
+                                callIAGemini();
+                            }
                             reset();
                         }
 
@@ -1887,13 +1983,13 @@ function play() {
                             boardgame[i].placePiece(instanciarClasse(selectedPiece, boardgame[i].x, boardgame[i].y));
                             //instancia a torre na nova casa, usa função única *para não quebrar o sistema de turno
                             boardgame[i + 1].placePiece(instanciarTorre(boardgame[i + 1].x, boardgame[i + 1].y));
-                            // setTimeout(() => {
-                            //     checkBestMoves();
 
-                            // }, 4000)
 
                             playTakePiece();//som
                             checkXeque();
+                            if (turno === timeIA) {
+                                callIAGemini();
+                            }
                             reset();
                         }
 

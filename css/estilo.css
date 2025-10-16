@@ -46,7 +46,7 @@
         border: 3px solid transparent;
         border-image: var(--gradient_gemini) 3  ;
         padding: .5em;
-        background-color: #2b2a2a;
+        background-color: #111010;
         color: #97b695;
         pointer-events: none;
         

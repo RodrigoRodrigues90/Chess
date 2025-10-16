@@ -14,7 +14,7 @@ export const pretas = 0; //time pretas
 export let isxeque;
 import { calculateBishopDestinations, calculateKingDestinations, calculateKnightDestinations, calculatePawnDestinations, calculateQueenDestinations, calculateRookDestinations, extrairNotacaoDaResposta } from "./calculate_moves_utils.js";
 import { setEnPassantSquare, gerarFENdoTabuleiro } from "./fen_utils.js";
-import { nullCastleIAByMovePiece, placeNotationToSquare, isCasaSobAtaque, searchForIndexEnPassant, executeRoque, movePieceTransfer, putMessageOnDisplay , isRoqueLegal } from "./rules_IA_utils.js";
+import { nullCastleIAByMovePiece, placeNotationToSquare, isCasaSobAtaque, searchForIndexEnPassant, executeRoque, movePieceTransfer, putMessageOnDisplay, isRoqueLegal } from "./rules_IA_utils.js";
 //import { gerarFENdoTabuleiro } from "./fen_utils.js";
 
 //------variaveis IA--------//
@@ -62,7 +62,8 @@ function selecionarMovimentoAleatorio(array) {
     return array[indiceAleatorio];
 }
 
-//==========GEMINI==========//
+//==========================//
+//        GEMINI IA         //
 //==========================//
 
 let partidaId = null; // Variável para armazenar o ID único da partida
@@ -72,57 +73,45 @@ function iniciarNovaPartida() {
     partidaId = Date.now().toString();
     console.log(`Nova partida iniciada com ID: ${partidaId}`);
 }
-function callIAGemini() {
+async function callIAGemini() {
+    const backendURL = "https://chess-backend-rust.vercel.app/api/jogada-ia";
     const estadoFEN = gerarFENdoTabuleiro(boardgame, turno, 1);
     const corIA = timeIA === pretas ? "Pretas" : "Brancas";
     console.log(`Chamando IA Gemini para o estado FEN: ${estadoFEN} | Cor da IA: ${corIA} | ID da Partida: ${partidaId}`);
-    fetch('http://localhost:3000/api/jogada-ia', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            fen: estadoFEN,
-            cor_ia: corIA,
-            sessionId: partidaId // O ID da sessão é a chave para o contexto!
-        })
-    })
-        .then(response => response.json())
-        .then(data => {
-            if (data.movimento) {
-                aplicarMovimentoRecebido(data.movimento);
-            }
-        })
-        .catch(error => {
-            window.alert("Erro de comunicação com o Gemini.", error);
-            // location.reload()
-        });
-}
-function recallGemini() {
-    const estadoFEN = gerarFENdoTabuleiro(boardgame, turno, 1);
-    const corIA = timeIA === pretas ? "Pretas" : "Brancas";
-    const message_correction = 'o seu movimento não é legal, pense de novo e responda apenas com a notação algébrica do movimento. Exemplo: e7e5, g1f3';
-    console.log(`Chamando IA Gemini para o estado FEN: ${estadoFEN} | Cor da IA: ${corIA} | ID da Partida: ${partidaId}`);
-    fetch('http://localhost:3000/api/jogada-ia', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            fen: estadoFEN,
-            cor_ia: corIA,
-            msg: message_correction,
-            sessionId: partidaId // O ID da sessão é a chave para o contexto!
-        })
-    })
-        .then(response => response.json())
-        .then(data => {
-            if (data.movimento) {
-                aplicarMovimentoRecebido(data.movimento);
-            }
-        })
-        .catch(error => {
-            window.alert("Erro de comunicação com o Gemini.", error);
-            location.reload()
-        });
-}
 
+
+    try {
+        const response = await fetch(backendURL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                fen: estadoFEN,
+                cor_ia: corIA,
+                sessionId: partidaId // O ID da sessão é a chave para o contexto!
+            })
+        });
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`Erro do servidor Vercel: ${response.status} - ${errorData.error || response.statusText}`);
+        }
+
+        const data = await response.json();
+        const movimentoIA = data.movimento; // Esperamos o formato 'origemdestino' (ex: 'g1f3')
+
+        if (movimentoIA) {
+            console.log(`Jogada recebida da IA: ${movimentoIA}`);
+            aplicarMovimentoRecebido(movimentoIA);
+        } else {
+            console.error("Resposta inválida da IA:", data);
+            alert("A IA retornou uma resposta inválida. Tente novamente.");
+        }
+
+    } catch (error) {
+        console.error("Erro na comunicação com o backend:", error);
+        alert("Falha ao comunicar com o servidor da IA.");
+        location.reload();
+    }
+}
 /**
  * Executa um movimento recebido como string na notação algébrica (ex: "g1f3")
  * recebido do Gemini, e renderiza a mudança no canvas.
@@ -151,7 +140,7 @@ function aplicarMovimentoRecebido(textoBrutoIA) {
     //4.1 se for um movimento de roque
     if (pieceIA.getName() === 'Rei' && Math.abs(fromIndex - toIndex) >= 2 && isRoqueLegal(fromIndex, toIndex, pieceIA.getTeam())) {
         executeRoque(fromIndex, toIndex);
-        
+
     } else {
         //4.2 se for movimento comum
         movePieceTransfer(fromIndex, toIndex);
@@ -164,62 +153,7 @@ function aplicarMovimentoRecebido(textoBrutoIA) {
     startTimer()
     constRender(context, invertido);
     putMessageOnDisplay(textoBrutoIA);
-
 }
-function checkBestMoves() {
-    if (timeIA == turno) {
-        for (let index = 0; index < boardgame.length; index++) {
-
-            if (boardgame[index].getPiece() != null &&
-                boardgame[index].getPiece().getTeam() == turno) {
-
-                boardgame[index].getPiece().move(index);
-
-                for (let j = 0; j < boardgame.length; j++) {
-
-                    if (boardgame[j].getPiece() != null && boardgame[j].getPiece().getAtacked()) {
-                        movimentosArray.unshift(new Movimentos(boardgame[index], boardgame[j], boardgame[index].getPiece(), boardgame[j].getPiece(), boardgame[j].getPiece().getPontos()));
-                    }
-                    if (boardgame[j].getSetted()) {
-                        movimentosArray.unshift(new Movimentos(boardgame[index], boardgame[j], boardgame[index].getPiece(), null, 0));
-                    }
-
-                }
-            }
-            reset();
-        }
-
-        movimentosArray.sort((a, b) => b.pontos - a.pontos);
-        movimentoEncontrado = movimentosArray[0];
-
-        if (movimentoEncontrado.pontos == 0) {
-            // IA MOVE PEÇA ALEATÒRIA
-            movimentoEncontrado = selecionarMovimentoAleatorio(movimentosArray);
-            if (movimentoEncontrado == undefined) {
-                movimentoEncontrado = movimentosArray[Math.floor(Math.random() * 19) + 1];
-                movimentoEncontrado.mover()
-                playPiece()
-            } else {
-                movimentoEncontrado.mover();
-                playPiece();
-            }
-
-        } else {
-            //IA TOMA PEÇA
-            movimentoEncontrado.tomar();
-            playTakePiece();
-        }
-        checkXeque();
-        constRender(context, invertido);
-
-        movimentosArray = [];
-    }
-}
-//-------------------------//
-
-
-
-
 
 //-----variáveis de tempo--------
 export var segundosTempo1 = 59;

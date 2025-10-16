@@ -113,60 +113,70 @@ export function searchForIndexEnPassant(casa, color) {
 
 
 /**
- * Executa o movimento de Roque (Rei + Torre) com base no lance da IA.
- * @param {number} kingFromIndex - Índice de origem do Rei (ex: 60 para e1).
- * @param {number} kingToIndex - Índice de destino do Rei (ex: 62 para g1).
+ * Transfere a Torre durante o movimento de Roque.
+ * @param {number} towerFromIndex - Índice de origem da Torre (ex: 63 para h1).
+ * @param {number} towerToIndex - Índice de destino da Torre (ex: 61 para f1).
  */
-export function executeRoque(kingFromIndex, kingToIndex) {
-    const kingPiece = boardgame[kingFromIndex].getPiece();
-    if (!kingPiece) return;
+function transferTower(towerFromIndex, towerToIndex) {
+    const casaTorreOrigem = boardgame[towerFromIndex];
+    const casaTorreDestino = boardgame[towerToIndex];
+    
+    const piece = casaTorreOrigem.getPiece(); 
+    
 
-    // A. Define as casas da Torre com base na direção do Roque
-    let rookFromIndex, rookToIndex;
-
-    if (kingToIndex > kingFromIndex) {
-        // Roque Curto (Kingside): Rei move 2 casas para a direita
-        rookFromIndex = kingFromIndex + 3; // Torre em h1 ou h8
-        rookToIndex = kingFromIndex + 1;   // Torre em f1 ou f8
-    } else {
-        // Roque Longo (Queenside): Rei move 2 casas para a esquerda
-        rookFromIndex = kingFromIndex - 4; // Torre em a1 ou a8
-        rookToIndex = kingFromIndex - 1;   // Torre em d1 ou d8
-    }
-
-    // B. Movimenta a Torre
-    moveRookForCastling(rookFromIndex, rookToIndex);
-
-    // C. Movimenta o Rei
-    movePieceTransfer(kingFromIndex, kingToIndex);
+    // 1. ATUALIZAÇÃO DO OBJETO PEÇA
+    // Atualiza as coordenadas do objeto Peça
+    piece.x = casaTorreDestino.x; 
+    piece.y = casaTorreDestino.y; 
+    
+    // Coloca a referência da peça na nova casa
+    casaTorreDestino.placePiece(piece);
+    
+    // 2. LIMPEZA NA ORIGEM
+    // Remove a referência da peça da casa de origem
+    casaTorreOrigem.takeOffPiece(); 
+    // Limpa o desenho da peça antiga
+    casaTorreOrigem.clear(context);
+    
 }
+
 
 /**
- * Move a Torre durante o Roque.
- * @param {number} rookFromIndex - Índice de origem da Torre (ex: 7 para h1).
- * @param {number} rookToIndex - Índice de destino da Torre (ex: 5 para f1).
+ * Executa o movimento de Roque (Rei + Torre)
+ * @param {number} kingFromIndex - Índice de origem do Rei (e1 ou e8).
+ * @param {number} kingToIndex - Índice de destino do Rei (c1, g1, c8 ou g8).
  */
-function moveRookForCastling(rookFromIndex, rookToIndex) {
-    const casaTorreOrigem = boardgame[rookFromIndex];
-    const casaTorreDestino = boardgame[rookToIndex];
+export function executeRoque(kingFromIndex, kingToIndex) {
+    const isWhite = boardgame[kingFromIndex].getPiece().getTeam() === brancas;
+    const isKingSide = kingToIndex > kingFromIndex; // g1 ou g8
+    
+    let towerFromIndex, towerToIndex;
 
-
-    // 1. INSTANCIAÇÃO NO DESTINO
-    // Se a Torre for uma classe que não a Torre normal, adapte 'instanciarTorre'
-    // Se for uma transferência de objeto peça:
-    const piece = casaTorreOrigem.getPiece(); // Pega a peça antes de setar null
-    if (piece) {
-        // Atualiza as coordenadas do objeto Peça
-        piece.x = casaTorreDestino.x;
-        piece.y = casaTorreDestino.y;
-
-        // Coloca a referência da peça na nova casa
-        casaTorreDestino.placePiece(piece);
+    if (isWhite) { // Rei Branco (e1 = 60)
+        if (isKingSide) { // Roque Curto (e1-g1)
+            towerFromIndex = 63; // h1
+            towerToIndex = 61; // f1
+        } else { // Roque Longo (e1-c1)
+            towerFromIndex = 56; // a1
+            towerToIndex = 59; // d1
+        }
+    } else { // Rei Preto (e8 = 4)
+        if (isKingSide) { // Roque Curto (e8-g8)
+            towerFromIndex = 7; // h8
+            towerToIndex = 5; // f8
+        } else { // Roque Longo (e8-c8)
+            towerFromIndex = 0; // a8
+            towerToIndex = 3; // d8
+        }
     }
-    // 2. LIMPEZA NA ORIGEM
-    casaTorreOrigem.clear(context);
-    casaTorreOrigem.takeOffPiece();
+    // 1. Move o Rei
+    movePieceTransfer(kingFromIndex, kingToIndex);
+
+    // 2. Move a Torre
+    transferTower(towerFromIndex, towerToIndex);    
 }
+
+
 /**
  * movimento de peças feito pela IA, chamando as funções de desenho no canvas
  */
@@ -174,31 +184,33 @@ export function movePieceTransfer(fromIndex, toIndex) {
     const casaOrigem = boardgame[fromIndex];
     const casaDestino = boardgame[toIndex];
     const piece = casaOrigem.getPiece();
-    const piecePlayer = casaDestino.getPiece();
-    if (!piece) return;
+    const piecePlayer = casaDestino.getPiece(); // peça que está no destino (possível captura)
 
-    // 1. Atualiza as coordenadas internas do objeto PEÇA
-    if (piece.x !== undefined && piece.y !== undefined) {
-        piece.x = casaDestino.x;
-        piece.y = casaDestino.y;
-    }
-
-    // 3. Limpa a casa de origem
-    casaOrigem.clear(context);
-    casaOrigem.takeOffPiece();
-
+    // A. LÓGICA DE CAPTURA (Se houver peça no destino)
     if (piecePlayer != null) {
+
+        // 1. Lógica de Pontuação e XequeMate
+        // Estes devem ser chamados APENAS se houve captura.
         pontuacao(piecePlayer);
         checkXequeMate(piecePlayer);
-        casaDestino.takeOffPiece();
-        casaDestino.clear(context);
+        // 2. Remove a referência da peça capturada
+        casaDestino.takeOffPiece(); 
     }
-    casaDestino.placePiece(piece);// coloca a peça na casa de destino
-    piece.x = casaDestino.x;
-    piece.y = casaDestino.y;
+    
+    // B. Atualiza as coordenadas internas do objeto PEÇA
+    if (piece.x !== undefined && piece.y !== undefined) {
+        piece.x = casaDestino.x; 
+        piece.y = casaDestino.y; 
+    }
+    
+    // C. Transfere a referência da PEÇA para o destino
+    casaDestino.placePiece(piece); 
+    
+    // D. Limpa a casa de origem
+    casaOrigem.clear(context);
+    casaOrigem.takeOffPiece(); 
 }
 
-// rules_IA_utils.js (Adicione esta função)
 
 /**
  * Checa se o Roque é legal (Rei não pode mover de, para, ou através de ataque).

@@ -41,8 +41,9 @@
         width: 24px;
     }
     >output{
-        width: 400px;
-        height:80px;
+        width: 300px;
+        min-height: 80px;
+        max-height: fit-content;
         border: 3px solid transparent;
         border-image: var(--gradient_gemini) 3  ;
         padding: .5em;

@@ -9,63 +9,15 @@ let coordenate_x = 0;//horizontal
 let coordenate_y = 0;//vertical
 let casa = 0;//usado para atualização do tabuleiro
 let invertido;// um Boolean: se escolher as pretas o tabuleiro é invertido;
+let timeIA;
 export const brancas = 1; //time brancas
 export const pretas = 0; //time pretas
 export let isxeque;
 import { calculateBishopDestinations, calculateKingDestinations, calculateKnightDestinations, calculatePawnDestinations, calculateQueenDestinations, calculateRookDestinations, extrairNotacaoDaResposta } from "./calculate_moves_utils.js";
 import { setEnPassantSquare, gerarFENdoTabuleiro } from "./fen_utils.js";
 import { nullCastleIAByMovePiece, placeNotationToSquare, isCasaSobAtaque, searchForIndexEnPassant, executeRoque, movePieceTransfer, putMessageOnDisplay, isRoqueLegal } from "./rules_IA_utils.js";
-//import { gerarFENdoTabuleiro } from "./fen_utils.js";
 
-//------variaveis IA--------//
-let movimentosArray = new Array(10000)
-let movimentoEncontrado;
-let timeIA;
-//-------------------------//
-
-
-
-
-//----movimentos IA-------//
-class Movimentos {
-
-    constructor(casaAtual_, casaDestino_, pieceIa, piecePlayer, pontos_) {
-        this.casaAtual = casaAtual_;
-        this.casaDestino = casaDestino_;
-        this.pieceia = pieceIa;
-        this.pieceplayer = piecePlayer;
-        this.pontos = pontos_;
-    }
-    mover() {
-        pontuacao(this.pieceplayer);
-        casaAtual = this.casaAtual;
-        casaDestino = this.casaDestino;
-        this.casaAtual.clear(context); //apaga a imagem da peça na casa onde estava anteriormente.
-        this.casaAtual.takeOffPiece(); //set null no atributo PEÇA da CASA anterior. 
-        this.casaDestino.placePiece(instanciarClasse(this.pieceia, this.casaDestino.x, this.casaDestino.y));
-    }
-    tomar() {
-        pontuacao(this.pieceplayer);
-        casaAtual = this.casaAtual;
-        casaDestino = this.casaDestino;
-        this.casaAtual.clear(context); //apaga a imagem da peça na casa onde estava anteriormente.
-        this.casaAtual.takeOffPiece(); //set null no atributo PEÇA da CASA anterior. 
-        this.casaDestino.placePiece(instanciarClasse(this.pieceia, this.casaDestino.x, this.casaDestino.y));
-        checkXequeMate(this.pieceplayer);
-    }
-}
-function selecionarMovimentoAleatorio(array) {
-    // Gera um índice aleatório entre 0 (inclusivo) e o tamanho do array (exclusivo)
-    const indiceAleatorio = Math.floor(Math.random() * array.length);
-
-    // Retorna o objeto correspondente ao índice aleatório
-    return array[indiceAleatorio];
-}
-
-//==========================//
-//        GEMINI IA         //
-//==========================//
-
+//GEMINI IA   
 let partidaId = null; // Variável para armazenar o ID único da partida
 
 function iniciarNovaPartida() {
@@ -109,13 +61,12 @@ async function callIAGemini() {
     } catch (error) {
         console.error("Erro na comunicação com o backend:", error);
         alert("Falha ao comunicar com o servidor da IA.");
-        location.reload();
     }
 }
 /**
  * Executa um movimento recebido como string na notação algébrica (ex: "g1f3")
  * recebido do Gemini, e renderiza a mudança no canvas.
- * @param {string} textoBrutoIA - A string do movimento, ex: "e7e5", "g1f3", "a7a8q" (para promoção).
+ * @param {string} textoBrutoIA - A string do movimento, ex: "e7e5", "g1f3".
  */
 function aplicarMovimentoRecebido(textoBrutoIA) {
     // 1. Extração Limpa do Lance
@@ -140,12 +91,13 @@ function aplicarMovimentoRecebido(textoBrutoIA) {
     //4.1 se for um movimento de roque
     if (pieceIA.getName() === 'Rei' && Math.abs(fromIndex - toIndex) >= 2 && isRoqueLegal(fromIndex, toIndex, pieceIA.getTeam())) {
         executeRoque(fromIndex, toIndex);
+        playTakePiece()
 
     } else {
         //4.2 se for movimento comum
         movePieceTransfer(fromIndex, toIndex);
+        playPiece()
     }
-
 
     nullCastleIAByMovePiece(pieceIA);
     checkXeque();
@@ -1829,116 +1781,116 @@ function play() {
             y = -(event.clientY - (rect.bottom - 23)) * (canvas.height + 20) / rect.height;
         }
 
-        //if (turno !== timeIA) {
-        for (let i = 0; i < boardgame.length; i++) {
+        if (turno !== timeIA) {
+            for (let i = 0; i < boardgame.length; i++) {
 
-            if (boardgame[i].calcDistance(x, y)) {
+                if (boardgame[i].calcDistance(x, y)) {
 
-                //*****se a casa selecionada estiver preenchida, será guardada a peça e a casa atual 
-                if (boardgame[i].isFilled()) {
-                    if (!verificaAtaque(i)) {// verifica se o movimento é um ataque. se não for, segue o fluxo.
-                        reset();
-                        selectedPiece = boardgame[i].getPiece(); //guarda a peça selecionada
-                        casaAtual = boardgame[i]; //guarda a casa da peça selecionada;
-                        casaAtualY = boardgame[i].y; //guarda a coordenada da peça selecionada
-                        if (verificarTurno()) {
-                            selectedPiece.move(i); //chama a função de movimentação da peça;
-                        }
-                    }
-
-                    //*****se a casa não tiver peça e estiver setada(verde), a peça guardada será colocada na casa clicada 
-                } else {
-                    if (boardgame[i].getSetted()) {
-                        reset();
-                        casaDestino = boardgame[i];  //guarda a casa que será colocada a peça;
-                        casaDestinoY = boardgame[i].y; //guarda a coordenada da casa em que será colocada a peça
-                        casaAtual.clear(context); //apaga a imagem da peça na casa onde estava anteriormente.
-                        casaAtual.takeOffPiece(); //set null no atributo PEÇA da CASA anterior. 
-                        casaDestino.placePiece(instanciarClasse(selectedPiece, boardgame[i].x, boardgame[i].y));// instancia a peça na casa selecionada.
-                        checkXeque();
-                        playPiece();//som
-                        if (turno === timeIA) {
-                            callIAGemini();
-                        }
-
-                    }
-                    //********regra do Enpassant  
-                    if (boardgame[i].getEnpassant()) {
-                        reset();
-                        casaDestino = boardgame[i];  //guarda a casa que será colocada a peça;
-                        casaAtual.clear(context); //apaga a imagem da peça na casa onde estava anteriormente.
-                        casaAtual.takeOffPiece(); //set null no atributo PEÇA da CASA anterior.
-                        pontuacao(casaEnPassant.getPiece());//pontuação
-                        casaEnPassant.clear(context); //apaga a imagem da peça
-                        casaEnPassant.takeOffPiece(); //set null no atributo PEÇA da CASA.
-                        casaDestino.placePiece(instanciarClasse(selectedPiece, boardgame[i].x, boardgame[i].y));// instancia a peça na casa selecionada.
-                        console.log(gerarFENdoTabuleiro(boardgame, turno, 1));
-                        checkXeque();
-                        playTakePiece();
-                        if (turno === timeIA) {
-                            callIAGemini();
-                        }
-
-                    }
-                    //********regra do Roque
-                    if (boardgame[i].getRoqueMove()) {
-
-                        //==================ROQUE DO LADO DO REI=====================
-
-                        if (boardgame[i].x > casaAtual.x) {
+                    //*****se a casa selecionada estiver preenchida, será guardada a peça e a casa atual 
+                    if (boardgame[i].isFilled()) {
+                        if (!verificaAtaque(i)) {// verifica se o movimento é um ataque. se não for, segue o fluxo.
                             reset();
-                            casaAtual.clear(context); //apaga a imagem da peça na casa onde estava anteriormente.
-                            casaAtual.takeOffPiece(); //set null no atributo PEÇA da CASA anterior.
-                            casaRoqueRei.clear(context);//apaga a torre da casa
-                            casaRoqueRei.takeOffPiece();//set null no atributo PEÇA da CASA.
+                            selectedPiece = boardgame[i].getPiece(); //guarda a peça selecionada
+                            casaAtual = boardgame[i]; //guarda a casa da peça selecionada;
+                            casaAtualY = boardgame[i].y; //guarda a coordenada da peça selecionada
+                            if (verificarTurno()) {
+                                selectedPiece.move(i); //chama a função de movimentação da peça;
+                            }
+                        }
 
-                            // instancia a peça na casa selecionada.
-                            boardgame[i].placePiece(instanciarClasse(selectedPiece, boardgame[i].x, boardgame[i].y));
-                            //instancia a torre na nova casa, usa função única *para não quebrar o sistema de turno
-                            boardgame[i - 1].placePiece(instanciarTorre(boardgame[i - 1].x, boardgame[i - 1].y));
-                            playTakePiece();//som
+                        //*****se a casa não tiver peça e estiver setada(verde), a peça guardada será colocada na casa clicada 
+                    } else {
+                        if (boardgame[i].getSetted()) {
+                            reset();
+                            casaDestino = boardgame[i];  //guarda a casa que será colocada a peça;
+                            casaDestinoY = boardgame[i].y; //guarda a coordenada da casa em que será colocada a peça
+                            casaAtual.clear(context); //apaga a imagem da peça na casa onde estava anteriormente.
+                            casaAtual.takeOffPiece(); //set null no atributo PEÇA da CASA anterior. 
+                            casaDestino.placePiece(instanciarClasse(selectedPiece, boardgame[i].x, boardgame[i].y));// instancia a peça na casa selecionada.
                             checkXeque();
+                            playPiece();//som
                             if (turno === timeIA) {
                                 callIAGemini();
                             }
-                            reset();
+
                         }
-
-                        //==================ROQUE DO LADO DA DAMA=====================
-
-                        if (boardgame[i].x < casaAtual.x) {
+                        //********regra do Enpassant  
+                        if (boardgame[i].getEnpassant()) {
                             reset();
+                            casaDestino = boardgame[i];  //guarda a casa que será colocada a peça;
                             casaAtual.clear(context); //apaga a imagem da peça na casa onde estava anteriormente.
                             casaAtual.takeOffPiece(); //set null no atributo PEÇA da CASA anterior.
-                            casaRoqueDama.clear(context);//apaga a torre da casa
-                            casaRoqueDama.takeOffPiece();//set null no atributo PEÇA da CASA.
-
-                            // instancia a peça na casa selecionada.
-                            boardgame[i].placePiece(instanciarClasse(selectedPiece, boardgame[i].x, boardgame[i].y));
-                            //instancia a torre na nova casa, usa função única *para não quebrar o sistema de turno
-                            boardgame[i + 1].placePiece(instanciarTorre(boardgame[i + 1].x, boardgame[i + 1].y));
-
-
-                            playTakePiece();//som
+                            pontuacao(casaEnPassant.getPiece());//pontuação
+                            casaEnPassant.clear(context); //apaga a imagem da peça
+                            casaEnPassant.takeOffPiece(); //set null no atributo PEÇA da CASA.
+                            casaDestino.placePiece(instanciarClasse(selectedPiece, boardgame[i].x, boardgame[i].y));// instancia a peça na casa selecionada.
+                            console.log(gerarFENdoTabuleiro(boardgame, turno, 1));
                             checkXeque();
+                            playTakePiece();
                             if (turno === timeIA) {
                                 callIAGemini();
                             }
-                            reset();
+
+                        }
+                        //********regra do Roque
+                        if (boardgame[i].getRoqueMove()) {
+
+                            //==================ROQUE DO LADO DO REI=====================
+
+                            if (boardgame[i].x > casaAtual.x) {
+                                reset();
+                                casaAtual.clear(context); //apaga a imagem da peça na casa onde estava anteriormente.
+                                casaAtual.takeOffPiece(); //set null no atributo PEÇA da CASA anterior.
+                                casaRoqueRei.clear(context);//apaga a torre da casa
+                                casaRoqueRei.takeOffPiece();//set null no atributo PEÇA da CASA.
+
+                                // instancia a peça na casa selecionada.
+                                boardgame[i].placePiece(instanciarClasse(selectedPiece, boardgame[i].x, boardgame[i].y));
+                                //instancia a torre na nova casa, usa função única *para não quebrar o sistema de turno
+                                boardgame[i - 1].placePiece(instanciarTorre(boardgame[i - 1].x, boardgame[i - 1].y));
+                                playTakePiece();//som
+                                checkXeque();
+                                if (turno === timeIA) {
+                                    callIAGemini();
+                                }
+                                reset();
+                            }
+
+                            //==================ROQUE DO LADO DA DAMA=====================
+
+                            if (boardgame[i].x < casaAtual.x) {
+                                reset();
+                                casaAtual.clear(context); //apaga a imagem da peça na casa onde estava anteriormente.
+                                casaAtual.takeOffPiece(); //set null no atributo PEÇA da CASA anterior.
+                                casaRoqueDama.clear(context);//apaga a torre da casa
+                                casaRoqueDama.takeOffPiece();//set null no atributo PEÇA da CASA.
+
+                                // instancia a peça na casa selecionada.
+                                boardgame[i].placePiece(instanciarClasse(selectedPiece, boardgame[i].x, boardgame[i].y));
+                                //instancia a torre na nova casa, usa função única *para não quebrar o sistema de turno
+                                boardgame[i + 1].placePiece(instanciarTorre(boardgame[i + 1].x, boardgame[i + 1].y));
+
+
+                                playTakePiece();//som
+                                checkXeque();
+                                if (turno === timeIA) {
+                                    callIAGemini();
+                                }
+                                reset();
+                            }
+
+                        }
+                        else {
+                            //*****se a casa não esta ocupada nem setada(verde), só apaga as cores do tabuleiro
+                            reset()
                         }
 
-                    }
-                    else {
-                        //*****se a casa não esta ocupada nem setada(verde), só apaga as cores do tabuleiro
-                        reset()
                     }
 
                 }
-
             }
+            constRender(context, invertido);
         }
-        constRender(context, invertido);
-        //}
 
     })
 }

@@ -2,7 +2,7 @@ import {
     setWhiteCastleKingSide, setWhiteCastleQueenSide,
     setBlackCastleKingSide, setBlackCastleQueenSide,
 } from "./fen_utils.js";
-import { boardgame, brancas, context, pontuacao, checkXequeMate, isxeque } from "./jogo.js";
+import { boardgame, brancas,pretas, context, pontuacao, checkXequeMate, isxeque } from "./jogo.js";
 
 // =================================================================
 // FUNÇÕES AUXILIARES PARA A IA
@@ -76,8 +76,10 @@ export function nullCastleIAByMovePiece(piece) {
 export function isCasaSobAtaque(targetIndex, colorEnemy) {
 
     for (let index = 0; index < boardgame.length; index++) {
+        if (!boardgame[index]) continue; //segurança
         // Checa se tem peça e se é do time inimigo
         if (boardgame[index].getPiece() && boardgame[index].getPiece().getTeam() === colorEnemy) {
+
 
             // Obtém os destinos da peça inimiga (lista de numeros)
             const enemyMoves = boardgame[index].getPiece().calculateMoves(index, colorEnemy);
@@ -186,27 +188,31 @@ export function movePieceTransfer(fromIndex, toIndex) {
     const piece = casaOrigem.getPiece();
     const piecePlayer = casaDestino.getPiece(); // peça que está no destino (possível captura)
 
-    // A. LÓGICA DE CAPTURA (Se houver peça no destino)
+    // LÓGICA DE CAPTURA (Se houver peça no destino)
     if (piecePlayer != null) {
 
-        // 1. Lógica de Pontuação e XequeMate
+        // Lógica de Pontuação e XequeMate
         // Estes devem ser chamados APENAS se houve captura.
         pontuacao(piecePlayer);
         checkXequeMate(piecePlayer);
-        // 2. Remove a referência da peça capturada
+        // Remove a referência da peça capturada
         casaDestino.takeOffPiece(); 
     }
     
-    // B. Atualiza as coordenadas internas do objeto PEÇA
+    // Atualiza as coordenadas internas do objeto PEÇA
     if (piece.x !== undefined && piece.y !== undefined) {
         piece.x = casaDestino.x; 
         piece.y = casaDestino.y; 
     }
+    // Marca que a peça já se moveu (importante para o Roque e o Primeiro Movimento do Peão)
+     if (piece.firstmove !== undefined) {
+        piece.firstmove = false;
+    }
     
-    // C. Transfere a referência da PEÇA para o destino
+    // Transfere a referência da PEÇA para o destino
     casaDestino.placePiece(piece); 
     
-    // D. Limpa a casa de origem
+    // Limpa a casa de origem
     casaOrigem.clear(context);
     casaOrigem.takeOffPiece(); 
 }

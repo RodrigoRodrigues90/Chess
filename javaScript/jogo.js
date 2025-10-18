@@ -61,6 +61,7 @@ async function callIAGemini() {
     } catch (error) {
         console.error("Erro na comunicação com o backend:", error);
         alert("Falha ao comunicar com o servidor da IA.");
+        location.reload();
     }
 }
 /**
@@ -89,7 +90,7 @@ function aplicarMovimentoRecebido(textoBrutoIA) {
     const fromIndex = boardgame.indexOf(from)
     const toIndex = boardgame.indexOf(to);
     //4.1 se for um movimento de roque
-    if (pieceIA.getName() === 'Rei' && Math.abs(fromIndex - toIndex) >= 2 && isRoqueLegal(fromIndex, toIndex, pieceIA.getTeam())) {
+    if (pieceIA.getName() === 'Rei' && pieceIA.isFirstMove() && isRoqueLegal(fromIndex, toIndex, pieceIA.getTeam())) {
         executeRoque(fromIndex, toIndex);
         playTakePiece()
 
@@ -1057,9 +1058,6 @@ class whiteCastle extends piece {
     }
     getPontos() {
         return 100;
-    }
-    getName() {
-        return this.name;
     }
     getSelect() {
         return this.select;

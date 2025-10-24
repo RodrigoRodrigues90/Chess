@@ -33,8 +33,8 @@ function createOrGetChatSession(sessionId, cor_ia) {
     }
     // Instrução do sistema para o Gemini
     const systemInstruction = `
-        Você é um jogador de xadrez nivel 1800 ELO. Você joga como as peças ${cor_ia}.
-        Seu objetivo é jogar a melhor jogada estratégica possível.
+        Você é um jogador de xadrez nivel 2800 ELO. Você joga como as peças ${cor_ia}.
+        Utilize seu acervo de aberturas e defesas.
         Responda SOMENTE NA SUA VEZ e SEMPRE com a jogada no formato 'origemdestino' (ex: e2e4, e NUNCA use 'exd5' 
         como movimento de captura, use e4d5 e tambem não descreva o movimento com a inicial da peça 
         ex: 'nc8c6' somente responda no formato origemdestino 'c8c6'), 
@@ -46,7 +46,7 @@ function createOrGetChatSession(sessionId, cor_ia) {
         model: model,
         config: {
             systemInstruction: systemInstruction,
-            temperature: 0.1
+            temperature: 0.2
         }
     });
 
@@ -60,9 +60,9 @@ function createOrGetChatSession(sessionId, cor_ia) {
 // --- Rota da IA de Xadrez ---
 app.post('/api/jogada-ia', async (req, res) => {
     // Agora esperamos um 'sessionId' do front-end
-    const { fen, cor_ia, sessionId } = req.body;
+    const { fen, cor_ia, sessionId, feedBackError } = req.body;
 
-    if (!fen || !cor_ia || !sessionId) {
+    if (!fen || !cor_ia || !sessionId ) {
         return res.status(400).json({ error: "FEN, cor_ia e sessionId são obrigatórios." });
     }
 
@@ -70,8 +70,17 @@ app.post('/api/jogada-ia', async (req, res) => {
         // 1. Recupera ou cria a sessão de chat (com contexto)
         const chat = createOrGetChatSession(sessionId, cor_ia);
 
-        // 2. A mensagem do usuário é simples, pois a instrução do sistema já guia o formato
-        const prompt = `A posição FEN atual é: ${fen}. Faça a sua jogada.`;
+         // 2. Constrói o prompt
+        let prompt;
+
+        // SE HOUVER FEEDBACK DE ERRO, INCLUI A INSTRUÇÃO DE CORREÇÃO.
+        if (feedBackError) {
+            // Se houver erro, a IA recebe a instrução completa do frontend
+            prompt = feedBackError;
+        } else {
+            // Caso contrário, usa o prompt padrão
+            prompt = `A posição FEN atual é: ${fen}. Faça a sua jogada.`;
+        }
 
         console.log(`ID: ${sessionId} | A calcular jogada para ${cor_ia}...`);
 
@@ -91,8 +100,6 @@ app.post('/api/jogada-ia', async (req, res) => {
         console.error("Erro na chamada à API Gemini:", error);
         // Em caso de erro, você pode querer remover a sessão para tentar novamente mais tarde.
         activeGameSessions.delete(sessionId);
-        window.alert(error.message)
-        location.reload()
     }
 });
 

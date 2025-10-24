@@ -2,7 +2,7 @@ import {
     setWhiteCastleKingSide, setWhiteCastleQueenSide,
     setBlackCastleKingSide, setBlackCastleQueenSide,
 } from "./fen_utils.js";
-import { boardgame, brancas,pretas, context, pontuacao, checkXequeMate, isxeque } from "./jogo.js";
+import { boardgame, brancas, pretas, context, pontuacao, checkXequeMate, isxeque, timeIA } from "./jogo.js";
 
 // =================================================================
 // FUNÇÕES AUXILIARES PARA A IA
@@ -122,24 +122,24 @@ export function searchForIndexEnPassant(casa, color) {
 function transferTower(towerFromIndex, towerToIndex) {
     const casaTorreOrigem = boardgame[towerFromIndex];
     const casaTorreDestino = boardgame[towerToIndex];
-    
-    const piece = casaTorreOrigem.getPiece(); 
-    
+
+    const piece = casaTorreOrigem.getPiece();
+
 
     // 1. ATUALIZAÇÃO DO OBJETO PEÇA
     // Atualiza as coordenadas do objeto Peça
-    piece.x = casaTorreDestino.x; 
-    piece.y = casaTorreDestino.y; 
-    
+    piece.x = casaTorreDestino.x;
+    piece.y = casaTorreDestino.y;
+
     // Coloca a referência da peça na nova casa
     casaTorreDestino.placePiece(piece);
-    
+
     // 2. LIMPEZA NA ORIGEM
     // Remove a referência da peça da casa de origem
-    casaTorreOrigem.takeOffPiece(); 
+    casaTorreOrigem.takeOffPiece();
     // Limpa o desenho da peça antiga
     casaTorreOrigem.clear(context);
-    
+
 }
 
 
@@ -151,7 +151,7 @@ function transferTower(towerFromIndex, towerToIndex) {
 export function executeRoque(kingFromIndex, kingToIndex) {
     const isWhite = boardgame[kingFromIndex].getPiece().getTeam() === brancas;
     const isKingSide = kingToIndex > kingFromIndex; // g1 ou g8
-    
+
     let towerFromIndex, towerToIndex;
 
     if (isWhite) { // Rei Branco (e1 = 60)
@@ -175,7 +175,7 @@ export function executeRoque(kingFromIndex, kingToIndex) {
     movePieceTransfer(kingFromIndex, kingToIndex);
 
     // 2. Move a Torre
-    transferTower(towerFromIndex, towerToIndex);    
+    transferTower(towerFromIndex, towerToIndex);
 }
 
 
@@ -196,25 +196,25 @@ export function movePieceTransfer(fromIndex, toIndex) {
         pontuacao(piecePlayer);
         checkXequeMate(piecePlayer);
         // Remove a referência da peça capturada
-        casaDestino.takeOffPiece(); 
+        casaDestino.takeOffPiece();
     }
-    
+
     // Atualiza as coordenadas internas do objeto PEÇA
     if (piece.x !== undefined && piece.y !== undefined) {
-        piece.x = casaDestino.x; 
-        piece.y = casaDestino.y; 
+        piece.x = casaDestino.x;
+        piece.y = casaDestino.y;
     }
     // Marca que a peça já se moveu (importante para o Roque e o Primeiro Movimento do Peão)
-     if (piece.firstmove !== undefined) {
+    if (piece.firstmove !== undefined) {
         piece.firstmove = false;
     }
-    
+
     // Transfere a referência da PEÇA para o destino
-    casaDestino.placePiece(piece); 
-    
+    casaDestino.placePiece(piece);
+
     // Limpa a casa de origem
     casaOrigem.clear(context);
-    casaOrigem.takeOffPiece(); 
+    casaOrigem.takeOffPiece();
 }
 
 
@@ -280,5 +280,71 @@ export function putMessageOnDisplay(text) {
         }
     }
     digitarCaractere()
+}
+/**
+ * função que determina se a IA está movendo uma peça da cor certa para uma casa 
+ * que ela pode se mover (atacando ou sendo um movimento natural da peça)
+ * @param {number} casaOrigem - casa de origem 
+ * @param {number} casaDestino - casa destino
+ * @param {object} pecaIa - a peça sendo movida
+ * @returns {boolean} - movimento válido ou não
+ */
+export function validarMovimentoIa(casaOrigem, casaDestino, pecaIa) {
+    if (!pecaIa) {
+        console.error("ERRO DE VALIDAÇÃO: Não há peça na casa de origem do movimento.");
+        return false;
+    }
+    if (pecaIa.getTeam() === timeIA) {
+        let movimentos;
+        let movimento_valido = false;
+
+        // CHECAGEM PEÃO: Se for Peão, a verificação de movimentação é diferente para ele
+        if (pecaIa.getName() === 'Peão') { 
+            movimentos = pecaIa.calculateMovesForIA(casaOrigem, timeIA)
+            let movimentos_lista = movimentos.flat();
+            movimento_valido = movimentos_lista.includes(casaDestino)
+            console.log(movimentos_lista, casaDestino)
+        } 
+        
+        // CHECAGEM REI: Se for Rei, verifica roque (não é visto em calculateMoves) E movimento normal
+        else if (pecaIa.getName() === "Rei") {
+            const origemFile = casaOrigem % 8;
+            const destinoFile = casaDestino % 8;
+            const fileDiff = Math.abs(destinoFile - origemFile);
+
+            // TENTATIVA DE ROQUE (movimento de 2 casas)
+            if (fileDiff === 2) {
+                if (isRoqueLegal(casaOrigem, casaDestino, timeIA)) {
+                    return true; // Movimento especial: Válido, retorna imediatamente.
+                } else {
+                    return false; // Roque ilegal, retorna imediatamente.
+                }
+            } 
+            // MOVIMENTO NORMAL DO REI (1 casa)
+            else { 
+                movimentos = pecaIa.calculateMoves(casaOrigem, timeIA)
+                movimento_valido = movimentos.includes(casaDestino)
+                console.log(movimentos, casaDestino)
+            }
+        }
+        
+        //  CHECAGEM GERAL: Se não for Peão nem Rei, segue o fluxo para outras peças (Torre, Dama, etc.)
+        else {
+            movimentos = pecaIa.calculateMoves(casaOrigem, timeIA)
+            movimento_valido = movimentos.includes(casaDestino)
+            console.log(movimentos, casaDestino)
+        }
+
+        // RETORNO FINAL: Para todos os casos que não retornaram imediatamente (roque)
+        if (movimento_valido) {
+            return true;
+        } else {
+            return false;
+        }
+    } 
+    // Peça não é do time da IA
+    else {
+        return false
+    }
 }
 

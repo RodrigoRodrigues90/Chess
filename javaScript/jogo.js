@@ -9,13 +9,13 @@ let coordenate_x = 0;//horizontal
 let coordenate_y = 0;//vertical
 let casa = 0;//usado para atualização do tabuleiro
 let invertido;// um Boolean: se escolher as pretas o tabuleiro é invertido;
-let timeIA;
+export let timeIA;
 export const brancas = 1; //time brancas
 export const pretas = 0; //time pretas
 export let isxeque;
 import { calculateBishopDestinations, calculateKingDestinations, calculateKnightDestinations, calculatePawnDestinations, calculateQueenDestinations, calculateRookDestinations, extrairNotacaoDaResposta } from "./calculate_moves_utils.js";
 import { setEnPassantSquare, gerarFENdoTabuleiro } from "./fen_utils.js";
-import { nullCastleIAByMovePiece, placeNotationToSquare, isCasaSobAtaque, searchForIndexEnPassant, executeRoque, movePieceTransfer, putMessageOnDisplay, isRoqueLegal } from "./rules_IA_utils.js";
+import { nullCastleIAByMovePiece, placeNotationToSquare, isCasaSobAtaque, searchForIndexEnPassant, executeRoque, movePieceTransfer, putMessageOnDisplay, isRoqueLegal, validarMovimentoIa } from "./rules_IA_utils.js";
 
 //GEMINI IA   
 let partidaId = null; // Variável para armazenar o ID único da partida
@@ -25,11 +25,12 @@ function iniciarNovaPartida() {
     partidaId = Date.now().toString();
     console.log(`Nova partida iniciada com ID: ${partidaId}`);
 }
-async function callIAGemini() {
-    const backendURL = "https://chess-backend-rust.vercel.app/api/jogada-ia";
+async function callIAGemini(feedBackError = "") {
+    const backendURL = "http://localhost:3000/api/jogada-ia";
+    //const backendURL = "https://chess-backend-rust.vercel.app/api/jogada-ia";
     const estadoFEN = gerarFENdoTabuleiro(boardgame, turno, 1);
     const corIA = timeIA === pretas ? "Pretas" : "Brancas";
-    console.log(`Chamando IA Gemini para o estado FEN: ${estadoFEN} | Cor da IA: ${corIA} | ID da Partida: ${partidaId}`);
+    console.log(`Chamando IA Gemini para o estado FEN: ${estadoFEN} | Cor da IA: ${corIA} | ID da Partida: ${partidaId} | feedback: ${feedBackError}`);
 
 
     try {
@@ -39,26 +40,24 @@ async function callIAGemini() {
             body: JSON.stringify({
                 fen: estadoFEN,
                 cor_ia: corIA,
-                sessionId: partidaId // O ID da sessão é a chave para o contexto!
+                sessionId: partidaId, // O ID da sessão é a chave para o contexto!
+                feedBackError: feedBackError // msg para corrigir movimento inválido do gemini 
             })
         });
         if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(`Erro do servidor Vercel: ${response.status} - ${errorData.error || response.statusText}`);
-        }
-
-        const data = await response.json();
-        const movimentoIA = data.movimento; // Esperamos o formato 'origemdestino' (ex: 'g1f3')
-
-        if (movimentoIA) {
+            alert(errorData)
+            location.reload();
+        } else {
+            // se a resposta estiver no formato json o fluxo segue normalmente
+            const data = await response.json();
+            const movimentoIA = data.movimento; // é esperado o formato 'origemdestino' (ex: 'g1f3')
             console.log(`Jogada recebida da IA: ${movimentoIA}`);
             aplicarMovimentoRecebido(movimentoIA);
-        } else {
-            console.error("Resposta inválida da IA:", data);
-            alert("A IA retornou uma resposta inválida. Tente novamente.");
         }
 
     } catch (error) {
+        // erro se o servidor está fora off
         console.error("Erro na comunicação com o backend:", error);
         alert("Falha ao comunicar com o servidor da IA.");
         location.reload();
@@ -74,7 +73,9 @@ function aplicarMovimentoRecebido(textoBrutoIA) {
     const movimento_IA = extrairNotacaoDaResposta(textoBrutoIA);
     let from, to, pieceIA;
     if (movimento_IA === null) {
-        console.warn("Não foi possível processar a jogada da IA, retornando.");
+        const feedBackError = 'por favor, forneça a jogada SOMENTE com a notação origem/destino (ex: e2e4)'
+        alert('O Gemini fez um movimento inválido, solicitando nova jogada.')
+        callIAGemini(feedBackError)
         return;
     }
     //2. separa origem de destino
@@ -84,28 +85,60 @@ function aplicarMovimentoRecebido(textoBrutoIA) {
     // 3. Encontra os objetos CASA
     from = boardgame.find(casa => casa.getIndex() === origemNotacao)// casa de origem
     to = boardgame.find(casa => casa.getIndex() === destinoNotacao) // casa de destino
-    pieceIA = from.getPiece();
 
-    //4. EXECUÇÃO DO MOVIMENTO
-    const fromIndex = boardgame.indexOf(from)
-    const toIndex = boardgame.indexOf(to);
-    //4.1 se for um movimento de roque
-    if (pieceIA.getName() === 'Rei' && pieceIA.isFirstMove() && isRoqueLegal(fromIndex, toIndex, pieceIA.getTeam())) {
-        executeRoque(fromIndex, toIndex);
-        playTakePiece()
+    // Garantia de que 'from' não é nulo antes de tentar pegar a peça (Defensivo)
+    pieceIA = from ? from.getPiece() : null;
 
-    } else {
-        //4.2 se for movimento comum
-        movePieceTransfer(fromIndex, toIndex);
-        playPiece()
+    // 4. Validar movimento
+    if (validarMovimentoIa(boardgame.indexOf(from), boardgame.indexOf(to), pieceIA)) {
+        console.log('movimento válido')
+
+        // --- INÍCIO DA EXECUÇÃO DO MOVIMENTO VÁLIDO ---
+
+        // 5. EXECUÇÃO DO MOVIMENTO
+        const fromIndex = boardgame.indexOf(from)
+        const toIndex = boardgame.indexOf(to);
+
+        // 5.1 se for um movimento de roque
+        if (pieceIA.getName() === 'Rei' && pieceIA.isFirstMove() && isRoqueLegal(fromIndex, toIndex, pieceIA.getTeam())) {
+            executeRoque(fromIndex, toIndex);
+            playTakePiece()
+
+        } else {
+            // 5.2 se for movimento comum
+            movePieceTransfer(fromIndex, toIndex);
+            playPiece()
+        }
+
+        // 6. ATUALIZAÇÃO DO ESTADO APÓS MOVIMENTO
+        nullCastleIAByMovePiece(pieceIA);
+        checkXeque();
+        trocarTurno();
+        startTimer()
+        constRender(context, invertido);
+        putMessageOnDisplay(textoBrutoIA); // Confirma a jogada válida da IA
+
+        // --- FIM DA EXECUÇÃO DO MOVIMENTO VÁLIDO ---
     }
+    else {
+        // --- INÍCIO DO TRATAMENTO DE MOVIMENTO INVÁLIDO ---
 
-    nullCastleIAByMovePiece(pieceIA);
-    checkXeque();
-    trocarTurno();
-    startTimer()
-    constRender(context, invertido);
-    putMessageOnDisplay(textoBrutoIA);
+        const movimentoInvalido = `${origemNotacao}${destinoNotacao}`;
+
+        // Mensagem detalhada para a IA (Feedback Adicional)
+        const feedbackIA = `O movimento que você forneceu (${movimentoInvalido}) é ilegal ou inválido no estado atual do jogo, pois a peça não pode se mover/capturar para o destino ${destinoNotacao} ou a casa de origem ${origemNotacao} está vazia. Você DEVE fornecer um novo movimento VÁLIDO no formato de notação algébrica (ex: e2e4).`;
+
+        // Mensagem curta para o usuário
+        const mensagemErroUsuario = `O movimento fornecido pela IA ('${movimentoInvalido}') é inválido. Solicitando uma nova jogada...`;
+
+        // 1. Informa o usuário sobre o erro
+        alert(mensagemErroUsuario);
+
+        // 2. Solicita uma nova jogada à IA, passando o feedback de erro.
+        callIAGemini(feedbackIA);
+
+        // --- FIM DO TRATAMENTO DE MOVIMENTO INVÁLIDO ---        
+    }
 }
 
 //-----variáveis de tempo--------
@@ -1352,6 +1385,9 @@ class whitePawn extends piece {
         var movesAtackPawn = calculatePawnDestinations(value, color, this.firstmove)
         return movesAtackPawn[1];
     }
+    calculateMovesForIA(value, color) {
+        return calculatePawnDestinations(value, color, this.firstmove);
+    }
     move(value) {
         var movimentos = calculatePawnDestinations(value, brancas, this.firstmove)
         var movefowards = movimentos[0];
@@ -1675,6 +1711,9 @@ class blackPawn extends piece {
     }
     erasePiece(ctx) {
         ctx.clearRect(this.x, this.y, 35, 18);
+    }
+    calculateMovesForIA(value, color) {
+        return calculatePawnDestinations(value, color, this.firstmove);
     }
     calculateMoves(index, color) {
         var moves = calculatePawnDestinations(index, color, this.firstmove)

@@ -4,22 +4,25 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <script src="./javaScript/fen_utils.js" type="module"></script> 
-    <script src="./javaScript//rules_IA_utils.js" type="module"></script> 
+    <script src="./javaScript/fen_utils.js" type="module"></script>
+    <script src="./javaScript//rules_IA_utils.js" type="module"></script>
     <script src="./javaScript/calculate_moves_utils.js" type="module"></script>
-    <script src="./javaScript/jogo.js" type="module"></script> 
+    <script src="./javaScript/jogo.js" type="module"></script>
     <link rel="stylesheet" href="./css/estilo.css">
     <link rel="icon" href="./img/horse.png" type="image/x-icon">
     <title>ChessVsStockfish</title>
 </head>
+
 <body onload="desabilitarPlay()">
     <input id="volume" type="button" class="volumeButton" onclick="stopMusic()"></input>
     <section class="wrapper-jogo" id="wrapper-play">
-        <h1 id="title"><img style="width: 36px;" src="./img/horse.png" class="horse">ChessVs<p class="gemini-color">Stockfish</p></h1>
-        <div class="wrapper-message-gemini">
-            <div class="info-gemini">
-                <img src="./img/stockfish.webp" alt="logo-gemini">
-                <output type="text" id="input-msg-gemini" value="" readonly> </output>
+        <h1 id="title"><img style="width: 36px;" src="./img/horse.png" class="horse">ChessVs<p class="stockfish-color">
+                Stockfish</p>
+        </h1>
+        <div class="wrapper-message-stockfish">
+            <div class="info-stockfish">
+                <div class="img-stockfish"></div>
+                <output type="text" id="input-msg-stockfish" value="" readonly> </output>
             </div>
         </div>
         <div class="info">
@@ -73,7 +76,8 @@
     <footer>
         <div class="rodape">
             <div>
-                <p>Desenvolvido por: <a href="https://rodrigorodrigues90.github.io/Portfolio/" target="blank"> Rodrigo Rodrigues.</a></p>
+                <p>Desenvolvido por: <a href="https://rodrigorodrigues90.github.io/Portfolio/" target="blank"> Rodrigo
+                        Rodrigues.</a></p>
             </div>
             <div class="divIcons">
                 <div class="contatoIcon">
@@ -96,4 +100,5 @@
         </div>
     </footer>
 </body>
+
 </html>

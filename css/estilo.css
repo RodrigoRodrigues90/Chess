@@ -13,42 +13,55 @@
             #bcbe9686,
             #787254a4);
 
-    --gradient_gemini: linear-gradient(0deg,
-            #20572ee5,
-            #7cb689ee);    
+    --gradient_stockfish: linear-gradient(40deg,
+            #0f4132,
+            #83b98c);
 }
 
+@keyframes glow {
+    0% {
+        box-shadow: 0px 0px 12px 1px #0d3d30;
+    }
+    100% {
+        box-shadow: 0px 0px 15px 3px #165f4a;
+    }
+}
+@keyframes grow{
+    0% {
+        transform: scale();
+    }
+    100%{
+        transform: scale(1.03);
+    }
+}
 
-.gemini-color {
+.stockfish-color {
     font-weight: 900;
-    background-image: var(--gradient_gemini);
+    background-image: var(--gradient_stockfish);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     /* Cor de fallback para navegadores que não suportam a máscara */
     color: white;
 }
 
-.wrapper-message-gemini {
+.wrapper-message-stockfish {
     display: flex;
     justify-content: center;
-    align-items: center;;
+    align-items: center;
+    ;
     width: 100%;
 }
 
-.info-gemini {
+.info-stockfish {
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
     align-items: center;
-    
-    >img {
-        width: 100px;
-    }
 
     >output {
         text-align: center;
         width: 100px;
-        height: 20px;    
+        height: 20px;
         background-color: #111010;
         color: #97b695;
         pointer-events: none;
@@ -57,9 +70,46 @@
 
 }
 
+.img-stockfish {
+    width: 100px;
+    height: 100px;
+    border-radius: 20px;
+    margin-bottom: 15px;
+    position: relative;
+    z-index: 1;
+}
+
+.img-stockfish::after {
+    content: '';
+    top: 4%;
+    left: 4%;
+    position: absolute;
+    width: 92px;
+    height: 92px;
+    border-radius: 20px;
+    animation: glow 2s infinite alternate ;
+    z-index: 2;
+}
+
+.img-stockfish::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 20px;
+    background-image: url(../img/stockfish.png);
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+    animation: grow 2s infinite alternate;
+    z-index: 3;
+}
+
 @media(max-width: 450px) {
-    .info-gemini>output {
-      
+    .info-stockfish>output {
+
         font-size: 0.8em;
     }
 }
@@ -111,7 +161,7 @@ body {
 h1 {
     cursor: pointer;
     display: flex;
-    color:white;
+    color: white;
 
 }
 

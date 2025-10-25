@@ -256,7 +256,7 @@ export function isRoqueLegal(kingFromIndex, kingToIndex, kingColor) {
  * @param {string} text O texto completo a ser exibido.
  */
 export function putMessageOnDisplay(text) {
-    const output = document.getElementById('input-msg-gemini');
+    const output = document.getElementById('input-msg-stockfish');
 
     const textArray = text.split('');
     let i = 0;
@@ -276,7 +276,7 @@ export function putMessageOnDisplay(text) {
             i++;
 
             // Agenda a próxima execução (chamada recursiva) com o atraso da velocidade
-            setTimeout(digitarCaractere, 30);
+            setTimeout(digitarCaractere, 50);
         }
     }
     digitarCaractere()

@@ -17,31 +17,18 @@ import { calculateBishopDestinations, calculateKingDestinations, calculateKnight
 import { setEnPassantSquare, gerarFENdoTabuleiro } from "./fen_utils.js";
 import { nullCastleIAByMovePiece, placeNotationToSquare, isCasaSobAtaque, searchForIndexEnPassant, executeRoque, movePieceTransfer, putMessageOnDisplay, isRoqueLegal, validarMovimentoIa } from "./rules_IA_utils.js";
 
-//GEMINI IA   
-let partidaId = null; // Variável para armazenar o ID único da partida
 
-function iniciarNovaPartida() {
-    // Gerar um ID único para a nova partida 
-    partidaId = Date.now().toString();
-    console.log(`Nova partida iniciada com ID: ${partidaId}`);
-}
-async function callIAGemini(feedBackError = "") {
-    //const backendURL = "http://localhost:3000/api/jogada-ia";
-    const backendURL = "https://chess-backend-rust.vercel.app/api/jogada-ia";
+async function callIA() {
+    // const backendURL = "http://localhost:3000/api/jogada-ia";
+    const backendURL = "https://chess-stockfish-iota.vercel.app/api/jogada-ia";
     const estadoFEN = gerarFENdoTabuleiro(boardgame, turno, 1);
-    const corIA = timeIA === pretas ? "Pretas" : "Brancas";
-    console.log(`Chamando IA Gemini para o estado FEN: ${estadoFEN} | Cor da IA: ${corIA} | ID da Partida: ${partidaId} | feedback: ${feedBackError}`);
-
-
+    
     try {
         const response = await fetch(backendURL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 fen: estadoFEN,
-                cor_ia: corIA,
-                sessionId: partidaId, // O ID da sessão é a chave para o contexto!
-                feedBackError: feedBackError // msg para corrigir movimento inválido do gemini 
             })
         });
         if (!response.ok) {
@@ -52,7 +39,6 @@ async function callIAGemini(feedBackError = "") {
             // se a resposta estiver no formato json o fluxo segue normalmente
             const data = await response.json();
             const movimentoIA = data.movimento; // é esperado o formato 'origemdestino' (ex: 'g1f3')
-            console.log(`Jogada recebida da IA: ${movimentoIA}`);
             aplicarMovimentoRecebido(movimentoIA);
         }
 
@@ -60,22 +46,22 @@ async function callIAGemini(feedBackError = "") {
         // erro se o servidor está fora off
         console.error("Erro na comunicação com o backend:", error);
         alert("Falha ao comunicar com o servidor da IA.");
-        location.reload();
+        //location.reload();
     }
 }
 /**
  * Executa um movimento recebido como string na notação algébrica (ex: "g1f3")
- * recebido do Gemini, e renderiza a mudança no canvas.
+ * recebido da IA, e renderiza a mudança no canvas.
  * @param {string} textoBrutoIA - A string do movimento, ex: "e7e5", "g1f3".
  */
 function aplicarMovimentoRecebido(textoBrutoIA) {
     // 1. Extração Limpa do Lance
     const movimento_IA = extrairNotacaoDaResposta(textoBrutoIA);
     let from, to, pieceIA;
+
     if (movimento_IA === null) {
-        const feedBackError = 'por favor, forneça a jogada SOMENTE com a notação origem/destino (ex: e2e4)'
-        alert('O Gemini fez um movimento inválido, solicitando nova jogada.')
-        callIAGemini(feedBackError)
+        alert('Houve algum erro na resposta da IA, solicitando nova jogada.')
+        callIA()
         return;
     }
     //2. separa origem de destino
@@ -91,7 +77,6 @@ function aplicarMovimentoRecebido(textoBrutoIA) {
 
     // 4. Validar movimento
     if (validarMovimentoIa(boardgame.indexOf(from), boardgame.indexOf(to), pieceIA)) {
-        console.log('movimento válido')
 
         // --- INÍCIO DA EXECUÇÃO DO MOVIMENTO VÁLIDO ---
 
@@ -125,17 +110,14 @@ function aplicarMovimentoRecebido(textoBrutoIA) {
 
         const movimentoInvalido = `${origemNotacao}${destinoNotacao}`;
 
-        // Mensagem detalhada para a IA (Feedback Adicional)
-        const feedbackIA = `O movimento que você forneceu (${movimentoInvalido}) é ilegal ou inválido no estado atual do jogo, pois a peça não pode se mover/capturar para o destino ${destinoNotacao} ou a casa de origem ${origemNotacao} está vazia. Você DEVE fornecer um novo movimento VÁLIDO no formato de notação algébrica (ex: e2e4).`;
-
         // Mensagem curta para o usuário
         const mensagemErroUsuario = `O movimento fornecido pela IA ('${movimentoInvalido}') é inválido. Solicitando uma nova jogada...`;
 
         // 1. Informa o usuário sobre o erro
         alert(mensagemErroUsuario);
 
-        // 2. Solicita uma nova jogada à IA, passando o feedback de erro.
-        callIAGemini(feedbackIA);
+        // 2. Solicita uma nova jogada à IA.
+        callIA();
 
         // --- FIM DO TRATAMENTO DE MOVIMENTO INVÁLIDO ---        
     }
@@ -573,7 +555,7 @@ function verificaAtaque(valor) {
         checkXequeMate(pecaEliminada);
 
         if (turno === timeIA) {
-            callIAGemini();
+            callIA();
         }
     }
     return valida;
@@ -1776,9 +1758,8 @@ function play() {
     playClickSound();//som
     playMusic();
 
-    iniciarNovaPartida()
     if (timeIA === brancas) {
-        callIAGemini();
+        callIA();
     }
     //hover--------------------
     canvas.addEventListener("mousemove", (event) => {
@@ -1847,7 +1828,7 @@ function play() {
                             checkXeque();
                             playPiece();//som
                             if (turno === timeIA) {
-                                callIAGemini();
+                                callIA();
                             }
 
                         }
@@ -1865,7 +1846,7 @@ function play() {
                             checkXeque();
                             playTakePiece();
                             if (turno === timeIA) {
-                                callIAGemini();
+                                callIA();
                             }
 
                         }
@@ -1888,7 +1869,7 @@ function play() {
                                 playTakePiece();//som
                                 checkXeque();
                                 if (turno === timeIA) {
-                                    callIAGemini();
+                                    callIA();
                                 }
                                 reset();
                             }
@@ -1911,7 +1892,7 @@ function play() {
                                 playTakePiece();//som
                                 checkXeque();
                                 if (turno === timeIA) {
-                                    callIAGemini();
+                                    callIA();
                                 }
                                 reset();
                             }

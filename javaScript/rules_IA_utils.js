@@ -291,7 +291,6 @@ export function putMessageOnDisplay(text) {
  */
 export function validarMovimentoIa(casaOrigem, casaDestino, pecaIa) {
     if (!pecaIa) {
-        console.error("ERRO DE VALIDAÇÃO: Não há peça na casa de origem do movimento.");
         return false;
     }
     if (pecaIa.getTeam() === timeIA) {
@@ -303,7 +302,6 @@ export function validarMovimentoIa(casaOrigem, casaDestino, pecaIa) {
             movimentos = pecaIa.calculateMovesForIA(casaOrigem, timeIA)
             let movimentos_lista = movimentos.flat();
             movimento_valido = movimentos_lista.includes(casaDestino)
-            console.log(movimentos_lista, casaDestino)
         } 
         
         // CHECAGEM REI: Se for Rei, verifica roque (não é visto em calculateMoves) E movimento normal
@@ -324,7 +322,6 @@ export function validarMovimentoIa(casaOrigem, casaDestino, pecaIa) {
             else { 
                 movimentos = pecaIa.calculateMoves(casaOrigem, timeIA)
                 movimento_valido = movimentos.includes(casaDestino)
-                console.log(movimentos, casaDestino)
             }
         }
         
@@ -332,7 +329,6 @@ export function validarMovimentoIa(casaOrigem, casaDestino, pecaIa) {
         else {
             movimentos = pecaIa.calculateMoves(casaOrigem, timeIA)
             movimento_valido = movimentos.includes(casaDestino)
-            console.log(movimentos, casaDestino)
         }
 
         // RETORNO FINAL: Para todos os casos que não retornaram imediatamente (roque)

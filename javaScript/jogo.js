@@ -19,8 +19,8 @@ import { nullCastleIAByMovePiece, placeNotationToSquare, isCasaSobAtaque, search
 
 
 async function callIA() {
-    const backendURL = "http://localhost:3000/api/jogada-ia";
-    //const backendURL = "https://chess-stockfish-iota.vercel.app/api/jogada-ia";
+    //const backendURL = "http://localhost:3000/api/jogada-ia";
+    const backendURL = "https://chess-stockfish-iota.vercel.app/api/jogada-ia";
     const estadoFEN = gerarFENdoTabuleiro(boardgame, turno, 1);
     console.log(`${estadoFEN}`)
     try {
@@ -113,6 +113,7 @@ function aplicarMovimentoRecebido(textoBrutoIA) {
         from.takeOffPiece();
         from.clear(context) // Remove o objeto Peão
         to.placePiece(pieceIA);// Coloca o objeto Dama/Torre, etc.
+        playPiece();
         playPromoSound()
 
     }
@@ -348,16 +349,7 @@ function checkXeque() {//conferir se o lance está em xeque
         boardgame[int].setInXeque(false);
         if (boardgame[int].getPiece() != null) {
 
-            if (Object.is(boardgame[int].getPiece().constructor, Bking.constructor)) {
-
-                if (boardgame[int].getPiece().getAtacked()) {
-                    document.getElementById("vez").innerHTML = "xeque! é a vez das " + vez;
-                    boardgame[int].setInXeque(true);
-                    isxeque = true;
-                    playXequeSound();
-                }
-            }//--- operação || (ou) por algum motivo não comparava os dois casos, então foi colocado separadamente.
-            if (Object.is(boardgame[int].getPiece().constructor, Wking.constructor)) {
+            if ((Object.is(boardgame[int].getPiece().constructor, Bking.constructor)) || (Object.is(boardgame[int].getPiece().constructor, Wking.constructor)) ) {
 
                 if (boardgame[int].getPiece().getAtacked()) {
                     document.getElementById("vez").innerHTML = "xeque! é a vez das " + vez;
@@ -366,7 +358,6 @@ function checkXeque() {//conferir se o lance está em xeque
                     playXequeSound();
                 }
             }
-
         }
 
     }
@@ -374,23 +365,7 @@ function checkXeque() {//conferir se o lance está em xeque
     return isxeque;
 }
 export function checkXequeMate(obj) {//xeque-mate!!!
-    var Bking = new blackKing(0, 0);
-    var Wking = new whiteKing(0, 0);
-
-    if (Object.is(obj.constructor, Wking.constructor)) {
-        playWinSound()
-        setTimeout(function () {
-            playXequeMateAlert();
-            window.location.reload()
-        }, 100)
-    }
-    if (Object.is(obj.constructor, Bking.constructor)) {
-        playWinSound()
-        setTimeout(function () {
-            playXequeMateAlert();
-            window.location.reload()
-        }, 100)
-    }
+   
 }
 //----------------------------------------
 

@@ -276,34 +276,4 @@ export function calculatePawnDestinations(actualIndex, color, isFirstMove) {
 
     return destinos;
 }
-// jogo.js (ou rules_IA_utils.js, dependendo de onde você preferir as utilidades)
 
-/**
- * Analisa a string de resposta do Gemini (que pode conter comentários) 
- * e extrai o lance no formato UMS (Universal Move Notation: e2e4, g1f3, a7a8q).
- * * @param {string} texto - A string completa devolvida pelo Gemini (Ex: "e7e5 roque, segurança do rei.")
- * @returns {string | null} O lance limpo (ex: "e7e5"), ou null se não for encontrado.
- */
-export function extrairNotacaoDaResposta(texto) {
-    if (!texto || typeof texto !== 'string') {
-        return null;
-    }
-
-    // O padrão de RegEx (Expressão Regular) que procuramos:
-    // 1. [a-h][1-8]: Duas casas de xadrez (ex: e2)
-    // 2. [a-h][1-8]: Mais duas casas de xadrez (ex: e4)
-    // 3. A notação pode estar em maiúsculas ou minúsculas (usamos 'i' para case insensitive)    
-    const regex = /([a-h][1-8][a-h][1-8])/i;
-
-    // A função .match() procura o padrão na string
-    const match = texto.match(regex);
-
-    if (match && match.length > 0) {
-        // match[0] contém o lance encontrado. Retornamos em minúsculas (convenção FEN/IA)
-        return match[0].toLowerCase();
-    } else {
-        // Se a notação do lance não for encontrada, retorna null
-        console.warn("Não foi possível extrair a notação do lance da resposta do Gemini:", texto);
-        return null; // Retorna null
-    }
-}

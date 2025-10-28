@@ -298,12 +298,12 @@ export function validarMovimentoIa(casaOrigem, casaDestino, pecaIa) {
         let movimento_valido = false;
 
         // CHECAGEM PEÃO: Se for Peão, a verificação de movimentação é diferente para ele
-        if (pecaIa.getName() === 'Peão') { 
+        if (pecaIa.getName() === 'Peão') {
             movimentos = pecaIa.calculateMovesForIA(casaOrigem, timeIA)
             let movimentos_lista = movimentos.flat();
             movimento_valido = movimentos_lista.includes(casaDestino)
-        } 
-        
+        }
+
         // CHECAGEM REI: Se for Rei, verifica roque (não é visto em calculateMoves) E movimento normal
         else if (pecaIa.getName() === "Rei") {
             const origemFile = casaOrigem % 8;
@@ -317,14 +317,14 @@ export function validarMovimentoIa(casaOrigem, casaDestino, pecaIa) {
                 } else {
                     return false; // Roque ilegal, retorna imediatamente.
                 }
-            } 
+            }
             // MOVIMENTO NORMAL DO REI (1 casa)
-            else { 
+            else {
                 movimentos = pecaIa.calculateMoves(casaOrigem, timeIA)
                 movimento_valido = movimentos.includes(casaDestino)
             }
         }
-        
+
         //  CHECAGEM GERAL: Se não for Peão nem Rei, segue o fluxo para outras peças (Torre, Dama, etc.)
         else {
             movimentos = pecaIa.calculateMoves(casaOrigem, timeIA)
@@ -337,10 +337,61 @@ export function validarMovimentoIa(casaOrigem, casaDestino, pecaIa) {
         } else {
             return false;
         }
-    } 
+    }
     // Peça não é do time da IA
     else {
         return false
     }
 }
+import {
+    whiteKnight,
+    whiteBishop,
+    whiteCastle,
+    whiteQueen,
+    blackBishop,
+    blackCastle,
+    blackKnight,
+    blackQueen
+} from "./jogo.js";
+/**
+ * Instancia a peça promovida na variável de pecaIA em aplicarMovimentoRecebido().
+ * @param {string} char - O caractere da peça ('Q', 'R', 'B', 'N').
+ * @param {object} from - a casa de origem da peça para receber as coordenadas.
+ * @returns {object} retorna a peça correspondente ao parametro char 
+ */
+export function instanciarPecaPromovida(char, from) {
+    let promo_piece;
+    switch (char) {
+        case 'Q':
+            if(timeIA === brancas){
+                promo_piece = new whiteQueen(from.x, from.y);
+            }else{
+                promo_piece = new blackQueen(from.x, from.y);
+            }
+            break;
+        case 'R':
+            if(timeIA === brancas){
+                promo_piece = new whiteCastle(from.x, from.y);
+            }else{
+                promo_piece = new blackCastle(from.x, from.y);
+            }
+            break;
+        case 'N':
+            if(timeIA === brancas){
+                promo_piece = new whiteKnight(from.x, from.y);
+            }else{
+                promo_piece = new blackKnight(from.x, from.y);
+            }
+            break;
+        case 'B':
+            if(timeIA === brancas){
+                promo_piece = new whiteBishop(from.x, from.y);
+            }else{
+                promo_piece = new blackBishop(from.x, from.y);
+            }
+            break;
+        default:
 
+    }
+    return promo_piece;
+}

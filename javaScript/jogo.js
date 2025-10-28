@@ -13,16 +13,16 @@ export let timeIA;
 export const brancas = 1; //time brancas
 export const pretas = 0; //time pretas
 export let isxeque;
-import { calculateBishopDestinations, calculateKingDestinations, calculateKnightDestinations, calculatePawnDestinations, calculateQueenDestinations, calculateRookDestinations, extrairNotacaoDaResposta } from "./calculate_moves_utils.js";
-import { setEnPassantSquare, gerarFENdoTabuleiro } from "./fen_utils.js";
-import { nullCastleIAByMovePiece, placeNotationToSquare, isCasaSobAtaque, searchForIndexEnPassant, executeRoque, movePieceTransfer, putMessageOnDisplay, isRoqueLegal, validarMovimentoIa } from "./rules_IA_utils.js";
+import { calculateBishopDestinations, calculateKingDestinations, calculateKnightDestinations, calculatePawnDestinations, calculateQueenDestinations, calculateRookDestinations } from "./calculate_moves_utils.js";
+import { setEnPassantSquare, gerarFENdoTabuleiro, extrairNotacaoDaResposta, enPassantSquare } from "./fen_utils.js";
+import { nullCastleIAByMovePiece, placeNotationToSquare, isCasaSobAtaque, searchForIndexEnPassant, executeRoque, movePieceTransfer, putMessageOnDisplay, instanciarPecaPromovida } from "./rules_IA_utils.js";
 
 
 async function callIA() {
-    // const backendURL = "http://localhost:3000/api/jogada-ia";
-    const backendURL = "https://chess-stockfish-iota.vercel.app/api/jogada-ia";
+    const backendURL = "http://localhost:3000/api/jogada-ia";
+    //const backendURL = "https://chess-stockfish-iota.vercel.app/api/jogada-ia";
     const estadoFEN = gerarFENdoTabuleiro(boardgame, turno, 1);
-    
+    console.log(`${estadoFEN}`)
     try {
         const response = await fetch(backendURL, {
             method: 'POST',
@@ -36,17 +36,16 @@ async function callIA() {
             alert(errorData)
             location.reload();
         } else {
-            // se a resposta estiver no formato json o fluxo segue normalmente
             const data = await response.json();
-            const movimentoIA = data.movimento; // é esperado o formato 'origemdestino' (ex: 'g1f3')
+            const movimentoIA = data.movimento;
             aplicarMovimentoRecebido(movimentoIA);
         }
 
     } catch (error) {
-        // erro se o servidor está fora off
+        // erro se o servidor está off
         console.error("Erro na comunicação com o backend:", error);
         alert("Falha ao comunicar com o servidor da IA.");
-        //location.reload();
+       // location.reload();
     }
 }
 /**
@@ -57,13 +56,8 @@ async function callIA() {
 function aplicarMovimentoRecebido(textoBrutoIA) {
     // 1. Extração Limpa do Lance
     const movimento_IA = extrairNotacaoDaResposta(textoBrutoIA);
-    let from, to, pieceIA;
+    let from, to, pieceIA, piecePlayer;
 
-    if (movimento_IA === null) {
-        alert('Houve algum erro na resposta da IA, solicitando nova jogada.')
-        callIA()
-        return;
-    }
     //2. separa origem de destino
     const origemNotacao = movimento_IA.substring(0, 2);
     const destinoNotacao = movimento_IA.substring(2, 4);
@@ -72,55 +66,83 @@ function aplicarMovimentoRecebido(textoBrutoIA) {
     from = boardgame.find(casa => casa.getIndex() === origemNotacao)// casa de origem
     to = boardgame.find(casa => casa.getIndex() === destinoNotacao) // casa de destino
 
-    // Garantia de que 'from' não é nulo antes de tentar pegar a peça (Defensivo)
-    pieceIA = from ? from.getPiece() : null;
+    //3.1 Encontra as peças
+    pieceIA = from.getPiece();
+    piecePlayer = to ? to.getPiece() : null; // se houver peça do jogador na casa
 
-    // 4. Validar movimento
-    if (validarMovimentoIa(boardgame.indexOf(from), boardgame.indexOf(to), pieceIA)) {
+    // 4. EXECUÇÃO DO MOVIMENTO
+    const fromIndex = boardgame.indexOf(from)
+    const toIndex = boardgame.indexOf(to);
 
-        // --- INÍCIO DA EXECUÇÃO DO MOVIMENTO VÁLIDO ---
-
-        // 5. EXECUÇÃO DO MOVIMENTO
-        const fromIndex = boardgame.indexOf(from)
-        const toIndex = boardgame.indexOf(to);
-
-        // 5.1 se for um movimento de roque
-        if (pieceIA.getName() === 'Rei' && pieceIA.isFirstMove() && isRoqueLegal(fromIndex, toIndex, pieceIA.getTeam())) {
-            executeRoque(fromIndex, toIndex);
-            playTakePiece()
-
+    // 4.1 se for um peão, validar uma casa para o enpassant ou executar o enpassant e verificar promoção.
+    let double_step = false; // flag para resetar ou não o estado de enpassant
+    let isPromotion = false; // flag para promoção do peão 
+    cancelEnPassant();
+    if (pieceIA.getName() === "Peão") {
+        const diff = Math.abs(fromIndex - toIndex);
+        if (diff === 16) {// verifica se é um salto duplo e seta a casa de tras para EnPassant
+            double_step = true;
+            pieceIA.setDoubleStep(true);
+            setEnPassantSquare(searchForIndexEnPassant(to, pieceIA.getTeam()));
         } else {
-            // 5.2 se for movimento comum
-            movePieceTransfer(fromIndex, toIndex);
-            playPiece()
+            if (to.getIndex() === enPassantSquare) { // verifica se a casa de destino é uma casa Enpassant
+                console.log("enpassant!")
+                let peca_enpassant = null;
+                if (timeIA === brancas) { // identifica peça para eliminar
+                    peca_enpassant = boardgame[toIndex + 8]
+                }
+                else {
+                    peca_enpassant = boardgame[toIndex - 8]
+                }
+                peca_enpassant.clear(context) //elimina peça adversaria
+                peca_enpassant.takeOffPiece()
+            }
         }
+        // 4.2 LÓGICA DE PROMOÇÃO: O lance tem 5 caracteres E a peça é um Peão
+        if (movimento_IA.length === 5) {
+            isPromotion = true; // Seta a flag de promoção para true
+        }
+    }
 
-        // 6. ATUALIZAÇÃO DO ESTADO APÓS MOVIMENTO
-        nullCastleIAByMovePiece(pieceIA);
-        checkXeque();
-        trocarTurno();
-        startTimer()
-        constRender(context, invertido);
-        putMessageOnDisplay(textoBrutoIA); // Confirma a jogada válida da IA
+    //  4.3: EXECUÇÃO DA PROMOÇÃO (Substitui o Peão pela nova Peça)
+    if (isPromotion) {
+        // Pega o quinto caractere do lance ("q", "r", "b", "n")
+        const pecaPromovidaChar = movimento_IA.charAt(4).toUpperCase(); // Ex: 'Q'
+        // se for promoção, é um peão, e será instanciado uma nova peça na variável
+        pieceIA = instanciarPecaPromovida(pecaPromovidaChar, to);
+        from.takeOffPiece();
+        from.clear(context) // Remove o objeto Peão
+        to.placePiece(pieceIA);// Coloca o objeto Dama/Torre, etc.
+        playPromoSound()
 
-        // --- FIM DA EXECUÇÃO DO MOVIMENTO VÁLIDO ---
+    }
+
+    // 4.4 se for um movimento de roque
+    else if (pieceIA.getName() === 'Rei' && pieceIA.isFirstMove() && (Math.abs(fromIndex - toIndex) === 2)) {
+        executeRoque(fromIndex, toIndex);
+        playTakePiece();
     }
     else {
-        // --- INÍCIO DO TRATAMENTO DE MOVIMENTO INVÁLIDO ---
-
-        const movimentoInvalido = `${origemNotacao}${destinoNotacao}`;
-
-        // Mensagem curta para o usuário
-        const mensagemErroUsuario = `O movimento fornecido pela IA ('${movimentoInvalido}') é inválido. Solicitando uma nova jogada...`;
-
-        // 1. Informa o usuário sobre o erro
-        alert(mensagemErroUsuario);
-
-        // 2. Solicita uma nova jogada à IA.
-        callIA();
-
-        // --- FIM DO TRATAMENTO DE MOVIMENTO INVÁLIDO ---        
+        // 4.5 se for movimento comum
+        movePieceTransfer(fromIndex, toIndex);
+        // 4.6 som do movimento
+        if (piecePlayer || (pieceIA.getName() === "Peão" && to.getIndex() === enPassantSquare)) {
+            playTakePiece();
+        } else {
+            playPiece();
+        }
     }
+
+    // 5. ATUALIZAÇÃO DO ESTADO APÓS MOVIMENTO
+    if (!double_step) { setEnPassantSquare(null) }
+    nullCastleIAByMovePiece(pieceIA);
+    checkXeque();
+    trocarTurno();
+    startTimer()
+    constRender(context, invertido);
+    putMessageOnDisplay(textoBrutoIA);
+    const estadoFEN = gerarFENdoTabuleiro(boardgame, turno, 1);
+    console.log(`${estadoFEN}`)
 }
 
 //-----variáveis de tempo--------
@@ -454,7 +476,7 @@ function instanciarClasse(params, x, y) {
 
     nullCastleIAByMovePiece(params);
     setEnPassantSquare(null);
-    cancelEnPassant(Wpawn, Bpawn);
+    cancelEnPassant();
 
     if (Object.is(obj.constructor, Wpawn.constructor)) {
         Wpawn.setFirstMove(false);//regra de primeiro movimento do peão.
@@ -759,15 +781,17 @@ function checkWhitePawnEnPassant(value) {
     }
 
 }
-function cancelEnPassant(Wpawn, Bpawn) {
+/**
+ * seta para falso a propriedade de salto duplo de todos os peões do tabuleiro.
+ * parte da logica de implementação do ataque enpassant. 
+ */
+function cancelEnPassant() {
 
     for (let int = 0; int < boardgame.length; int++) {
 
         if (boardgame[int].getPiece() != null) {
-            var obj = Object.prototype.constructor(boardgame[int].getPiece());
 
-            if (Object.is(obj.constructor, Wpawn.constructor) ||
-                Object.is(obj.constructor, Bpawn.constructor)) {
+            if (boardgame[int].getPiece().getName() === "Peão") {
                 boardgame[int].getPiece().setDoubleStep(false);
             }
         }
@@ -1055,7 +1079,7 @@ function printThis(ctx, x, y, inv, img) {//chama os metodos de desenho do canvas
 
 
 //--------peças brancas---------
-class whiteCastle extends piece {
+export class whiteCastle extends piece {
     constructor(x, y) {
         super(x, y)
         this.x = x;
@@ -1172,7 +1196,7 @@ class whiteKing extends piece {
         }
     }
 }
-class whiteBishop extends piece {
+export class whiteBishop extends piece {
     constructor(x, y) {
         super(x, y)
         this.x = x;
@@ -1219,7 +1243,7 @@ class whiteBishop extends piece {
         }
     }
 }
-class whiteKnight extends piece {
+export class whiteKnight extends piece {
     constructor(x, y) {
         super(x, y)
         this.x = x;
@@ -1266,7 +1290,7 @@ class whiteKnight extends piece {
         }
     }
 }
-class whiteQueen extends piece {
+export class whiteQueen extends piece {
     constructor(x, y) {
         super(x, y)
         this.x = x;
@@ -1389,7 +1413,7 @@ class whitePawn extends piece {
 
 
 //---------peças pretas----------
-class blackCastle extends piece {
+export class blackCastle extends piece {
     constructor(x, y) {
         super(x, y)
         this.x = x;
@@ -1505,7 +1529,7 @@ class blackKing extends piece {
 
     }
 }
-class blackBishop extends piece {
+export class blackBishop extends piece {
     constructor(x, y) {
         super(x, y)
         this.x = x;
@@ -1551,7 +1575,7 @@ class blackBishop extends piece {
         }
     }
 }
-class blackKnight extends piece {
+export class blackKnight extends piece {
     constructor(x, y) {
         super(x, y)
         this.x = x;
@@ -1598,7 +1622,7 @@ class blackKnight extends piece {
         }
     }
 }
-class blackQueen extends piece {
+ export class blackQueen extends piece {
     constructor(x, y) {
         super(x, y)
         this.x = x;

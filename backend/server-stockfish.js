@@ -38,7 +38,7 @@ app.post('/api/jogada-ia', async (req, res) => {
         await engine.setoption('UCI_AnalyseMode', false); 
         await engine.position(fen); 
 
-        const result = await engine.go({ depth: 18 }); 
+        const result = await engine.go({ depth: 1 }); 
         const bestMove = result.bestmove;
 
         res.json({ movimento: bestMove }); 

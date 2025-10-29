@@ -38,14 +38,16 @@ async function callIA() {
         } else {
             const data = await response.json();
             const movimentoIA = data.movimento;
+            const isMate_String = data.ismate;
             aplicarMovimentoRecebido(movimentoIA);
+            checkXequeMate(isMate_String)
         }
 
     } catch (error) {
         // erro se o servidor está off
         console.error("Erro na comunicação com o backend:", error);
         alert("Falha ao comunicar com o servidor da IA.");
-       // location.reload();
+        // location.reload();
     }
 }
 /**
@@ -349,7 +351,7 @@ function checkXeque() {//conferir se o lance está em xeque
         boardgame[int].setInXeque(false);
         if (boardgame[int].getPiece() != null) {
 
-            if ((Object.is(boardgame[int].getPiece().constructor, Bking.constructor)) || (Object.is(boardgame[int].getPiece().constructor, Wking.constructor)) ) {
+            if ((Object.is(boardgame[int].getPiece().constructor, Bking.constructor)) || (Object.is(boardgame[int].getPiece().constructor, Wking.constructor))) {
 
                 if (boardgame[int].getPiece().getAtacked()) {
                     document.getElementById("vez").innerHTML = "xeque! é a vez das " + vez;
@@ -364,8 +366,16 @@ function checkXeque() {//conferir se o lance está em xeque
     reset();
     return isxeque;
 }
-export function checkXequeMate(obj) {//xeque-mate!!!
-   
+export function checkXequeMate(string) {//xeque-mate!!!
+    if (string === "mate") {
+        playWinSound()
+        pausarTempo(!turno);
+        canvas.classList.add('canvas-disabled');
+        document.getElementById("vez").innerHTML = "xeque-mate!";
+        setTimeout(function () {
+            playXequeMateAlert();
+        }, 2000)
+    }
 }
 //----------------------------------------
 
@@ -1597,7 +1607,7 @@ export class blackKnight extends piece {
         }
     }
 }
- export class blackQueen extends piece {
+export class blackQueen extends piece {
     constructor(x, y) {
         super(x, y)
         this.x = x;

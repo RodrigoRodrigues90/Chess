@@ -4,20 +4,20 @@ const path = require('path');
 const app = express();
 const port = 3000;
 
-app.use(express.json()); 
+app.use(express.json());
 app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*'); 
+    res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
     next();
 });
 
-const NOME_DO_BINARIO = 'stockfish-ubuntu-x86-64-avx2'; 
+const NOME_DO_BINARIO = 'stockfish-ubuntu-x86-64-avx2';
 const STOCKFISH_PATH = path.join(__dirname, 'engines', NOME_DO_BINARIO);
 
 // --- Rota Raiz (Para evitar 404) ---
 app.get('/', (req, res) => {
-    res.status(200).json({ 
-        status: "OK", 
+    res.status(200).json({
+        status: "OK",
         message: `Chess AI Backend (Porta: ${port}) está online!`,
         endpoint_ia: "/api/jogada-ia (POST)",
     });
@@ -25,23 +25,26 @@ app.get('/', (req, res) => {
 
 app.post('/api/jogada-ia', async (req, res) => {
 
-    const { fen } = req.body; 
+    const { fen } = req.body;
 
     if (!fen) {
         return res.status(400).send({ error: "FEN não fornecido." });
     }
-    
-   const engine = new Engine(STOCKFISH_PATH);
+
+    const engine = new Engine(STOCKFISH_PATH);
 
     try {
         await engine.init();
-        await engine.setoption('UCI_AnalyseMode', false); 
-        await engine.position(fen); 
+        await engine.setoption('UCI_AnalyseMode', false);
+        await engine.position(fen);
 
-        const result = await engine.go({ depth: 1 }); 
+        const result = await engine.go({ depth: 10 });
         const bestMove = result.bestmove;
-
-        res.json({ movimento: bestMove }); 
+        const isMate = result.info[4].score.unit
+        res.json({
+            movimento: bestMove,
+            ismate: isMate
+        });
 
     } catch (error) {
         console.error("ERRO STOCKFISH/BACKEND (500):", error.message);

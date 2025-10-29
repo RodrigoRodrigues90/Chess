@@ -189,7 +189,11 @@ h1 {
     height: 24em;
     border: 1rem solid #391f02f2;
 }
-
+.canvas-disabled {
+    pointer-events: none;  
+    opacity: 0.7; 
+    cursor: default;
+}
 .tempo1 {
     position: absolute;
     top: 0;

@@ -15,7 +15,7 @@ export const pretas = 0; //time pretas
 export let isxeque;
 import { calculateBishopDestinations, calculateKingDestinations, calculateKnightDestinations, calculatePawnDestinations, calculateQueenDestinations, calculateRookDestinations } from "./calculate_moves_utils.js";
 import { setEnPassantSquare, gerarFENdoTabuleiro, extrairNotacaoDaResposta, enPassantSquare } from "./fen_utils.js";
-import { nullCastleIAByMovePiece, placeNotationToSquare, isCasaSobAtaque, searchForIndexEnPassant, executeRoque, movePieceTransfer, putMessageOnDisplay, instanciarPecaPromovida } from "./rules_IA_utils.js";
+import { nullCastleIAByMovePiece, placeNotationToSquare, isCasaSobAtaque, searchForIndexEnPassant, executeRoque, movePieceTransfer, putMessageOnDisplay, instanciarPecaPromovida, isMoveLegal } from "./rules_IA_utils.js";
 
 
 async function callIA() {
@@ -176,7 +176,7 @@ let torreDoRoque;
 
 
 //------cores------------------
-const colorgreen = "#70f24885";
+const colorgreen = "#a5b647e8";
 const colorred = "#cb343475";
 const colorblue = "#068CCA"
 const colorgrey = "#6d6315b5";
@@ -1113,7 +1113,10 @@ export class whiteCastle extends piece {
     move(value) {
         var movimentos = calculateRookDestinations(value, brancas)
         for (var i = 0; i < movimentos.length; i++) {
-            movement(movimentos[i], brancas)
+            if (isMoveLegal(value, movimentos[i], brancas)) {
+
+                movement(movimentos[i], brancas)
+            }
         }
     }
 }
@@ -1168,7 +1171,7 @@ class whiteKing extends piece {
     move(value) {
         var movimentos = calculateKingDestinations(value, brancas)
         for (var i = 0; i < movimentos.length; i++) {
-            if (!isCasaSobAtaque(movimentos[i], pretas)) {
+            if (!isCasaSobAtaque(movimentos[i], pretas) && isMoveLegal(value, movimentos[i], brancas)) {
 
                 movement(movimentos[i], brancas)
             }
@@ -1224,7 +1227,10 @@ export class whiteBishop extends piece {
 
         var movimentos = calculateBishopDestinations(value, brancas)
         for (var i = 0; i < movimentos.length; i++) {
-            movement(movimentos[i], brancas)
+            if (isMoveLegal(value, movimentos[i], brancas)) {
+
+                movement(movimentos[i], brancas)
+            }
         }
     }
 }
@@ -1271,7 +1277,10 @@ export class whiteKnight extends piece {
 
         var movimentos = calculateKnightDestinations(value, brancas)
         for (var i = 0; i < movimentos.length; i++) {
-            movement(movimentos[i], brancas)
+            if (isMoveLegal(value, movimentos[i], brancas)) {
+
+                movement(movimentos[i], brancas)
+            }
         }
     }
 }
@@ -1317,7 +1326,9 @@ export class whiteQueen extends piece {
     move(value) {
         var movimentos = calculateQueenDestinations(value, brancas)
         for (var i = 0; i < movimentos.length; i++) {
-            movement(movimentos[i], brancas)
+            if (isMoveLegal(value, movimentos[i], brancas)) {
+                movement(movimentos[i], brancas)
+            }
         }
     }
 
@@ -1384,10 +1395,17 @@ class whitePawn extends piece {
         var movefowards = movimentos[0];
         var moveAtack = movimentos[1]
         for (var i = 0; i < movefowards.length; i++) {
-            movement(movefowards[i], brancas)
+            const targetIndex = movefowards[i];
+            if (isMoveLegal(value, targetIndex, brancas)) {
+                movement(targetIndex, brancas)
+            }
         }
         for (let i = 0; i < moveAtack.length; i++) {
-            pawnAttack(moveAtack[i], brancas)
+            const targetIndex = moveAtack[i];
+            if (isMoveLegal(value, targetIndex, brancas)) {
+
+                pawnAttack(targetIndex, brancas)
+            }
 
         }
         checkBlackPawnEnPassant(value + 1);
@@ -1447,7 +1465,10 @@ export class blackCastle extends piece {
     move(value) {
         var movimentos = calculateRookDestinations(value, pretas)
         for (var i = 0; i < movimentos.length; i++) {
-            movement(movimentos[i], pretas)
+            if (isMoveLegal(value, movimentos[i], pretas)) {
+
+                movement(movimentos[i], pretas)
+            }
         }
     }
 }
@@ -1501,7 +1522,7 @@ class blackKing extends piece {
     move(value) {
         var movimentos = calculateKingDestinations(value, pretas)
         for (var i = 0; i < movimentos.length; i++) {
-            if (!isCasaSobAtaque(movimentos[i], brancas)) {
+            if (!isCasaSobAtaque(movimentos[i], brancas) && isMoveLegal(value, movimentos[i], pretas)) {
                 movement(movimentos[i], pretas)
             }
         }
@@ -1556,7 +1577,10 @@ export class blackBishop extends piece {
     move(value) {
         var movimentos = calculateBishopDestinations(value, pretas)
         for (var i = 0; i < movimentos.length; i++) {
-            movement(movimentos[i], pretas)
+            if (isMoveLegal(value, movimentos[i], pretas)) {
+
+                movement(movimentos[i], pretas)
+            }
         }
     }
 }
@@ -1603,7 +1627,10 @@ export class blackKnight extends piece {
 
         var movimentos = calculateKnightDestinations(value, pretas)
         for (var i = 0; i < movimentos.length; i++) {
-            movement(movimentos[i], pretas)
+            if (isMoveLegal(value, movimentos[i], pretas)) {
+
+                movement(movimentos[i], pretas)
+            }
         }
     }
 }
@@ -1649,7 +1676,10 @@ export class blackQueen extends piece {
     move(value) {
         var movimentos = calculateQueenDestinations(value, pretas)
         for (var i = 0; i < movimentos.length; i++) {
-            movement(movimentos[i], pretas)
+            if (isMoveLegal(value, movimentos[i], pretas)) {
+
+                movement(movimentos[i], pretas)
+            }
         }
     }
 }
@@ -1715,10 +1745,16 @@ class blackPawn extends piece {
         var movefowards = movimentos[0];
         var moveAtack = movimentos[1]
         for (var i = 0; i < movefowards.length; i++) {
-            movement(movefowards[i], pretas)
+            let targetIndex = movefowards[i];
+            if (isMoveLegal(value, targetIndex, pretas)) {
+                movement(targetIndex, pretas)
+            }
         }
         for (let i = 0; i < moveAtack.length; i++) {
-            pawnAttack(moveAtack[i], pretas)
+            let targetIndex = moveAtack[i]
+            if (isMoveLegal(value, targetIndex, pretas)) {
+                pawnAttack(targetIndex, pretas)
+            }
 
         }
         checkWhitePawnEnPassant(value + 1);

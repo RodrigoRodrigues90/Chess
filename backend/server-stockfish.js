@@ -38,7 +38,7 @@ app.post('/api/jogada-ia', async (req, res) => {
         await engine.setoption('UCI_AnalyseMode', false);
         await engine.position(fen);
 
-        const result = await engine.go({ depth: 10 });
+        const result = await engine.go({ depth: 1 });
         const bestMove = result.bestmove;
         const isMate = result.info[4].score.unit
         res.json({

@@ -187,7 +187,7 @@ h1 {
     padding: 0.5em;
     width: 24em;
     height: 24em;
-    border: 1rem solid #391f02f2;
+    border: 1rem solid rgb(25, 56, 41);
 }
 .canvas-disabled {
     pointer-events: none;  

@@ -2,7 +2,9 @@ import {
     setWhiteCastleKingSide, setWhiteCastleQueenSide,
     setBlackCastleKingSide, setBlackCastleQueenSide,
 } from "./fen_utils.js";
-import { boardgame, brancas, pretas, context, pontuacao, checkXequeMate, isxeque, timeIA } from "./jogo.js";
+import {
+    boardgame, brancas, pretas, context, pontuacao, checkXequeMate, isxeque, timeIA, whiteKnight,
+    whiteBishop, whiteCastle, whiteQueen, blackBishop, blackCastle, blackKnight, blackQueen } from "./jogo.js";
 
 // =================================================================
 // FUNÇÕES AUXILIARES PARA A IA
@@ -282,77 +284,64 @@ export function putMessageOnDisplay(text) {
     digitarCaractere()
 }
 /**
- * função que determina se a IA está movendo uma peça da cor certa para uma casa 
- * que ela pode se mover (atacando ou sendo um movimento natural da peça)
- * @param {number} casaOrigem - casa de origem 
- * @param {number} casaDestino - casa destino
- * @param {object} pecaIa - a peça sendo movida
- * @returns {boolean} - movimento válido ou não
+ * Esta função é usada para validar lances de peças cravadas.
+ * Simula os movimento e verifica se o Rei está seguro.
+ * @param {number} fromIndex - Índice de origem
+ * @param {number} toIndex - Índice de destino 
+ * @param {boolean} timeToMove - brancas ou pretas - cor da peça que está a mover
+ * @returns {boolean} True se o movimento for seguro (não resulta em Xeque), False caso contrário.
  */
-export function validarMovimentoIa(casaOrigem, casaDestino, pecaIa) {
-    if (!pecaIa) {
-        return false;
+export function isMoveLegal(fromIndex, toIndex, timeToMove) {
+    const fromSquare = boardgame[fromIndex];
+    const toSquare = boardgame[toIndex];
+    const pieceToMove = fromSquare.getPiece();
+    const oponentTeam = timeToMove === brancas ? pretas : brancas;
+
+    // --- 1. SALVAR ESTADO: Posição do Rei e Peça Capturada
+    const originalPieceOnTo = toSquare.getPiece();
+    const isCapture = originalPieceOnTo !== null;
+
+    // --- SALVAR COORDENADAS INTERNAS DA PEÇA MOVIDA (ASSUMIDO: O objeto peça armazena X/Y)
+    const originalPieceX = pieceToMove.x;
+    const originalPieceY = pieceToMove.y;
+
+    let newKingIndex = getKingSquareIndex(timeToMove);
+
+    if (pieceToMove && pieceToMove.getName() === "Rei") {
+        newKingIndex = toIndex;
     }
-    if (pecaIa.getTeam() === timeIA) {
-        let movimentos;
-        let movimento_valido = false;
 
-        // CHECAGEM PEÃO: Se for Peão, a verificação de movimentação é diferente para ele
-        if (pecaIa.getName() === 'Peão') {
-            movimentos = pecaIa.calculateMovesForIA(casaOrigem, timeIA)
-            let movimentos_lista = movimentos.flat();
-            movimento_valido = movimentos_lista.includes(casaDestino)
-        }
+    // --- 2. SIMULAR MOVIMENTO
+    // O movimento deve atualizar o X/Y da peça (por isso é importante restaurar)
+    toSquare.placePiece(pieceToMove); 
+    fromSquare.takeOffPiece();
+  
 
-        // CHECAGEM REI: Se for Rei, verifica roque (não é visto em calculateMoves) E movimento normal
-        else if (pecaIa.getName() === "Rei") {
-            const origemFile = casaOrigem % 8;
-            const destinoFile = casaDestino % 8;
-            const fileDiff = Math.abs(destinoFile - origemFile);
+    // --- 3. VERIFICAR A LEGALIDADE
+    const isStillInCheck = isCasaSobAtaque(newKingIndex, oponentTeam);
 
-            // TENTATIVA DE ROQUE (movimento de 2 casas)
-            if (fileDiff === 2) {
-                if (isRoqueLegal(casaOrigem, casaDestino, timeIA)) {
-                    return true; // Movimento especial: Válido, retorna imediatamente.
-                } else {
-                    return false; // Roque ilegal, retorna imediatamente.
-                }
-            }
-            // MOVIMENTO NORMAL DO REI (1 casa)
-            else {
-                movimentos = pecaIa.calculateMoves(casaOrigem, timeIA)
-                movimento_valido = movimentos.includes(casaDestino)
-            }
-        }
+    // --- 4. DESFAZER MOVIMENTO (RESTAURAR ESTADO)
+    
+    // RESTAURAÇÃO CRÍTICA DO ESTADO INTERNO DA PEÇA
+    pieceToMove.x = originalPieceX;
+    pieceToMove.y = originalPieceY;
+    
+    fromSquare.placePiece(pieceToMove); // Coloca a peça de volta na origem
 
-        //  CHECAGEM GERAL: Se não for Peão nem Rei, segue o fluxo para outras peças (Torre, Dama, etc.)
-        else {
-            movimentos = pecaIa.calculateMoves(casaOrigem, timeIA)
-            movimento_valido = movimentos.includes(casaDestino)
-        }
-
-        // RETORNO FINAL: Para todos os casos que não retornaram imediatamente (roque)
-        if (movimento_valido) {
-            return true;
-        } else {
-            return false;
-        }
+    if (isCapture) {
+        toSquare.placePiece(originalPieceOnTo);
+    } else {
+        toSquare.takeOffPiece();
     }
-    // Peça não é do time da IA
-    else {
-        return false
-    }
+    // 5. RETORNO
+    return !isStillInCheck;
 }
-import {
-    whiteKnight,
-    whiteBishop,
-    whiteCastle,
-    whiteQueen,
-    blackBishop,
-    blackCastle,
-    blackKnight,
-    blackQueen
-} from "./jogo.js";
+
+// FUNÇÂO AUXILIAR: encontra o indice do rei para evitar movimentos de peças cravadas.
+function getKingSquareIndex(team) {
+    return boardgame.findIndex(square => square.getPiece() && square.getPiece().getName() === "Rei" && square.getPiece().getTeam() === team);
+}
+
 /**
  * Instancia a peça promovida na variável de pecaIA em aplicarMovimentoRecebido().
  * @param {string} char - O caractere da peça ('Q', 'R', 'B', 'N').
@@ -363,30 +352,30 @@ export function instanciarPecaPromovida(char, from) {
     let promo_piece;
     switch (char) {
         case 'Q':
-            if(timeIA === brancas){
+            if (timeIA === brancas) {
                 promo_piece = new whiteQueen(from.x, from.y);
-            }else{
+            } else {
                 promo_piece = new blackQueen(from.x, from.y);
             }
             break;
         case 'R':
-            if(timeIA === brancas){
+            if (timeIA === brancas) {
                 promo_piece = new whiteCastle(from.x, from.y);
-            }else{
+            } else {
                 promo_piece = new blackCastle(from.x, from.y);
             }
             break;
         case 'N':
-            if(timeIA === brancas){
+            if (timeIA === brancas) {
                 promo_piece = new whiteKnight(from.x, from.y);
-            }else{
+            } else {
                 promo_piece = new blackKnight(from.x, from.y);
             }
             break;
         case 'B':
-            if(timeIA === brancas){
+            if (timeIA === brancas) {
                 promo_piece = new whiteBishop(from.x, from.y);
-            }else{
+            } else {
                 promo_piece = new blackBishop(from.x, from.y);
             }
             break;

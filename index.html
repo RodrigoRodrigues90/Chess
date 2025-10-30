@@ -58,14 +58,24 @@
 
             <div class="options">
                 <div>
-                    <p id="vez"> Escolha a cor das peças. </p>
+                    <p id="vez"> Escolha a dificuldade. </p>
                 </div>
 
-                <div>
+                <div class="option-color" id="option-color">
                     <input class="input" type="radio" id="brancas" name="opcao" onclick="escolherCor(this.id)">
                     <label>Brancas</label>
                     <input class="input" type="radio" id="negras" name="opcao" onclick="escolherCor(this.id)">
                     <label>Pretas</label>
+                </div>
+                <div class="option-level" id="option-level">
+                    <div>
+                        <input class="input" type="radio" id="facil" name="opcao" onclick="escolherNivel(this.id)">
+                        <label>Fácil</label>
+                    </div>
+                    <div>
+                        <input class="input" type="radio" id="dificil" name="opcao" onclick="escolherNivel(this.id)">
+                        <label>Difícil</label>
+                    </div>
                 </div>
 
                 <div class="div-button">

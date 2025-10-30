@@ -9,6 +9,7 @@ let coordenate_x = 0;//horizontal
 let coordenate_y = 0;//vertical
 let casa = 0;//usado para atualização do tabuleiro
 let invertido;// um Boolean: se escolher as pretas o tabuleiro é invertido;
+let engine_level; // define dificuldade do jogo
 export let timeIA;
 export const brancas = 1; //time brancas
 export const pretas = 0; //time pretas
@@ -19,16 +20,17 @@ import { nullCastleIAByMovePiece, placeNotationToSquare, isCasaSobAtaque, search
 
 
 async function callIA() {
-    //const backendURL = "http://localhost:3000/api/jogada-ia";
+    //const backendURL = "http://localhost:3000/api/jogada-ia";//teste
     const backendURL = "https://chess-stockfish-iota.vercel.app/api/jogada-ia";
     const estadoFEN = gerarFENdoTabuleiro(boardgame, turno, 1);
-    console.log(`${estadoFEN}`)
+    console.log(`dificuldade: nivel  ${engine_level}`)
     try {
         const response = await fetch(backendURL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 fen: estadoFEN,
+                level: engine_level
             })
         });
         if (!response.ok) {
@@ -47,7 +49,7 @@ async function callIA() {
         // erro se o servidor está off
         console.error("Erro na comunicação com o backend:", error);
         alert("Falha ao comunicar com o servidor da IA.");
-        // location.reload();
+        location.reload();
     }
 }
 /**
@@ -1765,12 +1767,15 @@ class blackPawn extends piece {
 //-------------------------------
 
 //----botoes da pagina-----------
+let option_color, option_level;
 function desabilitarPlay() {
     document.querySelector("#play").disabled = true;
     document.querySelector("#volume").disabled = true;
 }
 function habilitarPlay() {
-    document.querySelector("#play").disabled = false;
+    if(option_color && option_level){
+        document.querySelector("#play").disabled = false;
+    }
 }
 function escolherCor(valor) {
     if (valor == "brancas") {
@@ -1778,6 +1783,7 @@ function escolherCor(valor) {
         invertido = false;
         timeIA = pretas;
         render(context, invertido);
+        option_color = true
         habilitarPlay();
         playButtonSound();//som
 
@@ -1786,11 +1792,19 @@ function escolherCor(valor) {
         invertido = true;
         timeIA = brancas;
         render(context, invertido)
+        option_color = true
         habilitarPlay();
         playButtonSound();//som
 
     }
 
+}
+function escolherNivel(id) {
+    if (id === "facil" ? engine_level = 1 : engine_level = 5)
+    document.getElementById("vez").innerHTML = "escolha a cor das peças";
+    document.getElementById("option-level").style.display = "none";
+    document.getElementById("option-color").style.display = "block"
+    option_level = true;
 }
 function play() {
     document.querySelector("#play").style.border = 0;
@@ -1958,6 +1972,7 @@ function play() {
     })
 }
 window.desabilitarPlay = desabilitarPlay;
+window.escolherNivel = escolherNivel;
 window.escolherCor = escolherCor;
 window.play = play;
 window.stopMusic = stopMusic;

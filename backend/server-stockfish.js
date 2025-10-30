@@ -25,10 +25,10 @@ app.get('/', (req, res) => {
 
 app.post('/api/jogada-ia', async (req, res) => {
 
-    const { fen } = req.body;
+    const { fen, level } = req.body;
 
-    if (!fen) {
-        return res.status(400).send({ error: "FEN não fornecido." });
+    if (!fen || !level) {
+        return res.status(400).send({ error: "FEN e/ou level não fornecidos." });
     }
 
     const engine = new Engine(STOCKFISH_PATH);
@@ -38,7 +38,7 @@ app.post('/api/jogada-ia', async (req, res) => {
         await engine.setoption('UCI_AnalyseMode', false);
         await engine.position(fen);
 
-        const result = await engine.go({ depth: 1 });
+        const result = await engine.go({ depth: level });
         const bestMove = result.bestmove;
         const isMate = result.info[4].score.unit
         res.json({
